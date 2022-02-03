@@ -127,6 +127,7 @@ function make_update_aux(model::RichardsModel)
             effective_saturation(ν, Y.soil.ϑ_l, θ_r),
         )
         @. p.soil.ψ = pressure_head(vg_α, vg_n, vg_m, θ_r, Y.soil.ϑ_l, ν, S_s)
+       # @info p.soil.ψ
         return update_aux!
     end
 end

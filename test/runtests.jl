@@ -17,8 +17,6 @@ using ClimaLSM.Roots
 
 FT = Float64
 
-saved_values = SavedValues(FT, ClimaCore.Fields.FieldVector)
-
 include("./initial_structure_test.jl")
 include("./root_test.jl")
 include("./soiltest.jl")

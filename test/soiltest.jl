@@ -10,7 +10,7 @@ const zmin = FT(-10);
 const nelems = 50;
 
 soil_domain = Column(FT, zlim = (zmin, zmax), nelements = nelems);
-top_flux_bc = FT(0.0);
+top_flux_bc = FT(-1e-2);
 bot_flux_bc = FT(0.0);
 boundary_fluxes = (top_flux_bc = top_flux_bc, bot_flux_bc = bot_flux_bc)
 params = Soil.RichardsParameters{FT}(ν, vg_α, vg_n, vg_m, Ksat, S_s, θ_r);
@@ -44,11 +44,17 @@ init_soil!(Y, coords, soil.param_set)
 soil_ode! = make_ode_function(soil)
 
 t0 = FT(0);
-tf = FT(60);
+tf = FT(10);
 dt = FT(1);
-cb = SavingCallback((u, t, integrator) -> integrator.p, saved_values)
+
+sv1 = SavedValues(FT, ClimaCore.Fields.FieldVector)
+sv2 = SavedValues(FT, Vector{FT})                           
+cb = SavingCallback((t, u, integrator) -> (integrator.p), sv1)
+cb2 = SavingCallback((t, u, integrator) -> ([parent(integrator.p.soil.ψ)[end]]), sv2)
 prob = ODEProblem(soil_ode!, Y, (t0, tf), p);
-sol = solve(prob, Euler(); dt = dt, callback = cb);
+sol = solve(prob, Euler(); dt = dt, callback = CallbackSet(cb,cb2));
+parent(sv1.saveval[2].soil.ψ)[end] - parent(sv1.saveval[1].soil.ψ)[end]
+sv2.saveval[2] .- sv2.saveval[1]
 
 @test sum(parent(sol.u[end]) .== parent(Y.soil.ϑ_l)) == nelems
 # Testing that ψ +z is constant - > hydrostatic equilibrium
