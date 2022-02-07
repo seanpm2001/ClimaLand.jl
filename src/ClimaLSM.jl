@@ -71,8 +71,8 @@ function make_ode_function(model::AbstractModel)
     rhs! = make_rhs(model)
     update_aux! = make_update_aux(model)
     function ode_function!(dY, Y, p, t)
-        update_aux!(p, Y, t)
-        rhs!(dY, Y, p, t)
+        update_aux!(p, Y, t) # to get p(t)
+        rhs!(dY, Y, p, t) # this sets dY(t) #Y(t+Δt) = dY(t)*Δt + Y(t)
     end
     return ode_function!
 end

@@ -7,7 +7,7 @@ import ClimaLSM.Domains: coordinates
 import ClimaLSM:
     AbstractModel, make_update_aux, make_rhs, prognostic_vars, auxiliary_vars
 using UnPack
-export RichardsModel, RichardsParameters
+export RichardsModel, RichardsParameters, effective_saturation, hydraulic_conductivity, pressure_head
 
 """
     RichardsModel
