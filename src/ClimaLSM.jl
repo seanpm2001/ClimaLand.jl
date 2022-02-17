@@ -1,72 +1,35 @@
 module ClimaLSM
 using UnPack
+using DocStringExtensions
 using ClimaCore
 import ClimaCore: Fields
-include("Domains.jl")
+include("SharedUtilities/Domains.jl")
 using .Domains
-include("models.jl")
-include("Soil.jl")
-using .Soil
-import .Soil: source
-include("Roots.jl")
-using .Roots
-import .Roots: flow_out_roots
+include("SharedUtilities/models.jl")
 
-export RootSoilModel
 
+"""
+     AbstractLandModel{FT} <: AbstractModel{FT} 
+
+An abstract type for all land model types, which are used
+to simulated multiple land surface components as
+a single system. Standalone component runs do not require
+this interface and it should not be used for that purpose.
+
+Many methods taking an argument of type `AbstractLandModel` are
+extensions of functions defined for `AbstractModel`s. 
+There are default methods that apply for all `AbstractLandModel`s,
+including `make_update_aux`, `make_ode_function, `make_rhs`, 
+`initialize_prognostic`, `initialize_auxiliary`, `initialize`,
+and `coordinates`.
+
+Methods which dispatch on a specific type of AbstractLandModel
+include any function involving interactions between components,
+as these interactions depend on the components in the land model 
+and the versions of these component models being used.
+"""
 abstract type AbstractLandModel{FT} <: AbstractModel{FT} end
 
-"""
-    struct RootSoilModel{FT, SM <: AbstractModel{FT}, RM <: AbstractModel{FT}} <: AbstractLandModel{FT}
-
-A concrete type of `AbstractModel` for use in land surface modeling. Each component model of the
-`LandModel` is itself an `AbstractModel`.
-
-If a user wants to run in standalone, would they use this interface?
-No, but should it work ?
-"""
-struct RootSoilModel{
-    FT,
-    SM <: AbstractSoilModel{FT},
-    VM <: AbstractVegetationModel{FT},
-} <: AbstractLandModel{FT}
-    soil::SM
-    vegetation::VM
-end
-
-function RootSoilModel{FT}(;
-    soil_model_type::Type{SM},
-    soil_args::NamedTuple = (;),
-    vegetation_model_type::Type{VM},
-    vegetation_args::NamedTuple = (;),
-) where {FT, SM <: AbstractSoilModel{FT}, VM <: AbstractVegetationModel{FT}}
-    sources = (RootExtraction{FT}(),)
-    boundary_fluxes = FluxBC{FT}(FT(0.0), FT(0.0))
-    transpiration = PrescribedTranspiration{FT}((t::FT) -> FT(0.0))
-    root_extraction = PrognosticSoilPressure{FT}()
-    soil = soil_model_type(;
-        boundary_conditions = boundary_fluxes,
-        sources = sources,
-        soil_args...,
-    )
-    vegetation = vegetation_model_type(;
-        root_extraction = root_extraction,
-        transpiration = transpiration,
-        vegetation_args...,
-    )
-    args = (soil, vegetation)
-    return RootSoilModel{FT, typeof.(args)...}(args...)
-end
-
-function initialize_interactions(
-    land::RootSoilModel{FT, SM, RM},
-) where {FT, SM <: Soil.RichardsModel{FT}, RM <: Roots.RootsModel{FT}}
-
-    soil_coords = land.soil.coordinates
-    return (root_extraction = similar(soil_coords),)
-end
-
-land_components(land::RootSoilModel) = (:soil, :vegetation)
 
 function initialize(land::AbstractLandModel)
     components = land_components(land)
@@ -127,37 +90,8 @@ function make_ode_function(land::AbstractLandModel)
     return ode_function!
 end
 
-function make_interactions_update_aux(
-    land::RootSoilModel{FT, SM, RM},
-) where {FT, SM <: Soil.RichardsModel{FT}, RM <: Roots.RootsModel{FT}}
-    function update_aux!(p, Y, t)
-        @. p.root_extraction = FT(0.0)
-        ##Science goes here
-    end
-    return update_aux!
+### Concrete types of AbstractLandModels
+### and associated methods
+include("./root_soil_model.jl")
+
 end
-
-
-## Extending methods of the Roots and Soil Model
-struct PrognosticSoilPressure{FT} <: Roots.AbstractRootExtraction{FT} end
-
-function Roots.flow_out_roots(
-    re::PrognosticSoilPressure{FT},
-    model::Roots.RootsModel{FT},
-    Y::ClimaCore.Fields.FieldVector,
-    p::ClimaCore.Fields.FieldVector,
-    t::FT,
-)::FT where {FT}
-    return sum(p.root_extraction)
-end
-
-
-struct RootExtraction{FT} <: Soil.AbstractSoilSource{FT} end
-
-function Soil.source(src::RootExtraction{FT}, Y, p) where {FT}
-    V_layer = FT(1.0 * 0.15) # hardcoded
-    ρm = FT(1e6 / 18) # moles/m^3
-    return p.root_extraction ./ ρm ./ V_layer # Field
-end
-
-end # module
