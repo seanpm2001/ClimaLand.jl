@@ -6,7 +6,15 @@ version = "0.1.0"
 [deps]
 ClimaCore = "d414da3d-4745-48bb-8d80-42e94e092884"
 DocStringExtensions = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
+Interpolations = "a98d9a8b-a2ab-59e6-89dd-64a1c18fca59"
+NLsolve = "2774e3e8-f4cf-5e23-947b-6d7e65073b56"
+OrdinaryDiffEq = "1dea7af3-3e70-54e6-95c3-0bf5283fa5ed"
+Photosynthesis = "537ec7c9-aaee-45d0-8af0-4b77892958a6"
+PlantHydraulics = "d6acb6ec-f7e4-548d-b108-f8a3d9a6ce13"
+Revise = "295af30f-e4ad-537b-8983-00126c2a3abe"
+StomataModels = "5fa394f2-99ce-4e3a-9704-be7b3526889d"
 UnPack = "3a884ed6-31ef-47d7-9d2a-63182c4928ed"
+WaterPhysics = "20dd5ee6-61da-454b-ac5d-c09c2977e03a"
 
 [compat]
 julia = "1.7"

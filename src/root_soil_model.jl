@@ -2,7 +2,9 @@ include("Soil/Soil.jl")
 using .Soil
 import .Soil: source
 include("Vegetation/Roots.jl")
+include("Vegetation/Leaf.jl")
 using .Roots
+using .Leaf
 import .Roots: flow_out_roots
 
 export RootSoilModel
