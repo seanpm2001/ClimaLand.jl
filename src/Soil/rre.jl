@@ -89,29 +89,24 @@ with that value.
 This has been written so as to work with Differential Equations.jl.
 """
 function ClimaLSM.make_rhs(model::RichardsModel)
-    function rhs!(dY, Y, p, t)
+    function rhs!(dY, Y, p, t, inds)
         @unpack ν, vg_α, vg_n, vg_m, K_sat, S_s, θ_r = model.parameters
         top_flux_bc, bot_flux_bc =
             boundary_fluxes(model.boundary_conditions, p, t)
-        z = model.coordinates.z
         interpc2f = Operators.InterpolateC2F()
         gradc2f_water = Operators.GradientC2F()
         divf2c_water = Operators.DivergenceF2C(
             top = Operators.SetValue(Geometry.WVector(top_flux_bc)),
             bottom = Operators.SetValue(Geometry.WVector(bot_flux_bc)),
         )
+        z = ClimaCore.column(model.coordinates.z,inds...)
         @. dY.soil.ϑ_l =
             -(divf2c_water(-interpc2f(p.soil.K) * gradc2f_water(p.soil.ψ + z)))
-        # Horizontal contributions
-        horizontal_components!(dY, model.domain, model, p)
-
         # Source terms
         for src in model.sources
             source!(dY, src, Y, p)
         end
-
-        # This has to come last
-        dss!(dY, model.domain)
+        
     end
     return rhs!
 end
@@ -128,7 +123,7 @@ horizontal derivative operators.
 In the case of a hybrid box domain, the horizontal contributions are
 computed using the WeakDivergence and Gradient operators.
 """
-function horizontal_components!(
+function horizontal_tendencies!(
     dY::ClimaCore.Fields.FieldVector,
     domain::HybridBox,
     model::RichardsModel,
@@ -137,6 +132,7 @@ function horizontal_components!(
     hdiv = Operators.WeakDivergence()
     hgrad = Operators.Gradient()
     @. dY.soil.ϑ_l += -hdiv(-p.soil.K * hgrad(p.soil.ψ + model.coordinates.z))
+    dss!(dY, domain)
 end
 
 """
@@ -180,6 +176,25 @@ function ClimaLSM.make_update_aux(model::RichardsModel)
             effective_saturation(ν, Y.soil.ϑ_l, θ_r),
         )
         @. p.soil.ψ = pressure_head(vg_α, vg_n, vg_m, θ_r, Y.soil.ϑ_l, ν, S_s)
+        
     end
+    
     return update_aux!
+end
+
+function ClimaLSM.make_ode_function(model::RichardsModel)
+    rhs_col! = make_rhs(model)
+    update_aux_col! = make_update_aux(model)
+    function ode_function!(dY,Y,p,t)
+        Ni, Nj, _, _, Nh = size(ClimaCore.Spaces.local_geometry_data(axes(model.coordinates)))
+        for h in 1:Nh, j in 1:Nj, i in 1:Ni
+            inds = (i, j, h) 
+            p_col = ClimaCore.Fields.FieldVector(; name(model) => ClimaCore.column(p.soil, inds...)) # for a column, this returns p
+            Y_col = ClimaCore.Fields.FieldVector(; name(model) => ClimaCore.column(Y.soil, inds...)) # for a column, this returns p
+            dY_col = ClimaCore.Fields.FieldVector(; name(model) => ClimaCore.column(dY.soil, inds...)) # for a column, this returns p
+            update_aux_col!(p_col,Y_col,t)
+            rhs_col!(dY_col, Y_col, p_col, t, inds)
+        end
+        horizontal_tendencies!(dY,model.domain,model,p)
+    end
 end

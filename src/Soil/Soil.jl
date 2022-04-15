@@ -72,7 +72,8 @@ import ClimaLSM:
     auxiliary_vars,
     name,
     prognostic_types,
-    auxiliary_types
+    auxiliary_types,
+    make_ode_function
 export RichardsModel,
     RichardsParameters,
     EnergyHydrologyModel,
@@ -131,7 +132,7 @@ computing the right hand side.
 ClimaLSM.Domains.coordinates(model::AbstractSoilModel) = model.coordinates
 
 """
-   horizontal_components!(dY::ClimaCore.Fields.FieldVector,
+   horizontal_tendencies!(dY::ClimaCore.Fields.FieldVector,
                           domain::Column, _...)
 Updates dY in place by adding in the tendency terms resulting from
 horizontal derivative operators.
@@ -139,7 +140,7 @@ horizontal derivative operators.
 In the case of a column domain, there are no horizontal
 contributions to the right hand side.
 """
-function horizontal_components!(
+function horizontal_tendencies!(
     dY::ClimaCore.Fields.FieldVector,
     domain::Column,
     _...,
@@ -167,10 +168,58 @@ function dss!(dY::ClimaCore.Fields.FieldVector, domain::HybridBox)
     end
 end
 
+#=
+"""
+   NormalFlux{f<:Function} <: AbstractSoilBoundaryConditions
+
+A concrete type of boundary condition, which enforces
+boundary fluxes. The user supplies a function
+which returns a scalar flux (aligned with the outward normal to the 
+surface), of the form f(t, p). 
 
 """
-   FluxBC{FT} <: AbstractSoilBoundaryConditions{FT}
+struct NormalFlux{f<:Function} <: AbstractSoilBoundaryConditions
+    flux::f
+end
 
+
+"""
+   FreeDrainage{FT} <: AbstractSoilBoundaryConditions{FT}
+
+A concrete type of boundary condition, which enforces
+free drainage, i.e.
+``
+    ∇h = 1.
+``
+
+This is only appropriate for the bottom of the soil
+column, for water.
+"""
+struct FreeDrainage{FT} <: AbstractSoilBoundaryConditions{FT} end
+
+"""
+    boundary_fluxes(bc::NormalFlux, _...)
+
+A method which returns the correct boundary flux
+given the boundary condition type `NormalFlux`.
+"""
+function boundary_fluxes(bc::NormalFlux,p::ClimaCore.Fields.FieldVector, t::FT)::FT where {FT}
+    return bc.flux(t,p)
+end
+
+"""
+    boundary_fluxes(bc::FreeDrainage, _...)
+
+A method which returns the correct boundary flux
+given the boundary condition type `FreeDrainage`.
+"""
+function boundary_fluxes(bc::FreeDrainage,p::ClimaCore.Fields.FieldVector, t::FT)::FT where {FT}
+    # obtain the value of K at the first index, at the bottom of the domain.
+    return -Operators.getidx(p.soil.K, Operators.Interior(), 1) 
+end
+=#
+"""
+   FluxBC{FT} <: AbstractSoilBoundaryConditions{FT}
 A simple concrete type of boundary condition, which enforces
 constant fluxes at the top and bottom of the domain.
 """
@@ -181,10 +230,8 @@ end
 
 """
     boundary_fluxes(bc::FluxBC, _...)
-
 A function which returns the correct boundary flux
 given the boundary condition type `FluxBC`.
-
 This is a trivial example, but a more complex one would be e.g.
 Dirichlet conditions on the state, which then must be converted into
 a flux before being applied as a boundary condition.
@@ -192,7 +239,6 @@ a flux before being applied as a boundary condition.
 function boundary_fluxes(bc::FluxBC, _...)
     return bc.top_flux_bc, bc.bot_flux_bc
 end
-
 """
      source!(dY::ClimaCore.Fields.FieldVector,
              src::AbstractSoilSource,

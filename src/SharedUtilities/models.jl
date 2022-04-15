@@ -168,18 +168,18 @@ function initialize_auxiliary(
     )
 end
 
+function FieldFromNamedTuple(coords, nt::NamedTuple)
+    cmv(z) = nt
+    return cmv.(coords)
+end
+
 function initialize_vars(keys, types, state, model_name)
     FT = eltype(state)
     if length(keys) == 0
         return ClimaCore.Fields.FieldVector(; model_name => FT[])
     else
-        zero_states = map(types) do (T)
-            zero_instance = zero(T)
-            map(_ -> zero_instance, state)
-        end
-        return ClimaCore.Fields.FieldVector(;
-            model_name => (; zip(keys, zero_states)...),
-        )
+        zero_state = (;zip(keys, zero.(types))...)
+        return ClimaCore.Fields.FieldVector(; model_name => FieldFromNamedTuple(state, zero_state))
     end
 end
 
