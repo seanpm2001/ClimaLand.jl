@@ -27,12 +27,12 @@ function compute_NPP(npp_model::PrescribedNPPModel, _, _, t)
 end
 
 
-struct BulkNPools{FT} <: AbstractCarbonModel{FT}
+struct BulkNPools{FT, T} <: AbstractCarbonModel{FT}
     number_of_pools::Int
     labels::Vector{String}
     turnover_time::Vector{FT}
     allocation_fraction::Vector{FT}
-    environmental_limitations::Vector{FT}
+    environmental_limitations::T
     transfer_matrix::Matrix{FT}
     NPP::AbstractNPPModel{FT}
 end
@@ -48,22 +48,28 @@ function ClimaLSM.make_rhs(model::BulkNPools{FT}) where {FT}
     function rhs!(dY,Y,p,t) # gets the entire Y
         NPP = compute_NPP(model.NPP, Y,p,t)
         external_input = model.allocation_fraction*NPP
+        T_soil = 0.0
+        T_sfc = 0.0
         dY.carbon.pool .= external_input .+ 
-        model.transfer_matrix*(model.environmental_limitations ./ model.turnover_time .* Y.carbon.pool)
+        model.transfer_matrix*(model.environmental_limitations(T_sfc, T_soil) ./ model.turnover_time .* Y.carbon.pool)
     end
     return rhs!
 end
+function q10_scaling(T::FT; q_10::FT = 2.0, T_ref::FT = 298.15)::FT where {FT}# q10 is unitless
+    return q_10^((T-T_ref)/FT(10.0)) # 10 is K∘
+end
 
-function Clima2PoolDefault(::Type{FT}, NPP::AbstractNPPModel{FT}) where {FT}
+
+function Clima2PoolDefault(::Type{FT}, NPP::AbstractNPPModel{FT}; temperature_scaling::Function = q10_scaling) where {FT}
     # Default values here, some of these could also be passed
     # in, e.g. parameters
-    labels = ["fast","slow"]
+    labels = ["live","soil"]
     turnover_time = [10.0,100.0] # years
-    environmental_limitations = [1.0,1.0]# making dependent on T, θ
+    environmental_limitations(T_sfc, T_soil) = [temperature_scaling(T_sfc),temperature_scaling(T_soil)]# making dependent on T, θ
     allocation_fraction = [1.0,0.0] # constant or not?
     respired_fraction = 0.75 # unitless # model for this?
     transfer_matrix = [-1.0 0.0; (1.0-respired_fraction) -1.0] # unitless
-    return BulkNPools{FT}(2,
+    return BulkNPools{FT, typeof(environmental_limitations)}(2,
     labels,
     turnover_time,
     allocation_fraction,
@@ -72,7 +78,7 @@ function Clima2PoolDefault(::Type{FT}, NPP::AbstractNPPModel{FT}) where {FT}
     NPP)
 end
 NPP_model = PrescribedNPPModel{Float64}((t) -> 60+ 5*sin(2*pi*t/10)) # PgC/year
-carbon = Clima2PoolDefault(Float64, NPP_model)
+carbon = Clima2PoolDefault(Float64, NPP_model; temperature_scaling = (x) -> (1.0))
 Y,p,coords = initialize(carbon)
 
 Y.carbon.pool[1] = 600.0
