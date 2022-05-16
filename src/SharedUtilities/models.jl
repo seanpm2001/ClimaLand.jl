@@ -168,14 +168,17 @@ function initialize_auxiliary(
     )
 end
 
+zero_instance(T::Type) = zero(T)
+zero_instance(::Type{NTuple{N, T}}) where {N, T} = ntuple(i -> zero(T), N)
+
 function initialize_vars(keys, types, state, model_name)
     FT = eltype(state)
     if length(keys) == 0
         return ClimaCore.Fields.FieldVector(; model_name => FT[])
     else
         zero_states = map(types) do (T)
-            zero_instance = zero(T)
-            map(_ -> zero_instance, state)
+            zero_state = zero_instance(T)
+            map(_ -> zero_state, state)
         end
         return ClimaCore.Fields.FieldVector(;
             model_name => (; zip(keys, zero_states)...),

@@ -51,7 +51,6 @@ using DocStringExtensions
 import ClimaCore: Fields
 using CLIMAParameters: AbstractEarthParameterSet
 
-using ClimaLSM.Domains: AbstractVegetationDomain, RootDomain
 import ClimaLSM:
     AbstractModel,
     initialize_prognostic,
@@ -74,6 +73,8 @@ export RootsModel,
     PrescribedSoilPressure,
     PrescribedTranspiration,
     AbstractRootExtraction
+
+include("RootsDomain.jl")
 
 """
     AbstractVegetationModel{FT} <: AbstractModel{FT}
@@ -169,7 +170,7 @@ A function which returns the names of the prognostic
 variables of the `RootsModel`.
 """
 prognostic_vars(model::RootsModel) = (:rwc,)
-prognostic_types(model::RootsModel{FT}) where {FT} = (FT,)
+prognostic_types(model::RootsModel{FT}) where {FT} = (NTuple{2, FT},)
 """
     function flow(
         z1::FT,
