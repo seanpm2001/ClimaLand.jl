@@ -2,9 +2,6 @@ using OrdinaryDiffEq: ODEProblem, solve, RK4
 using Plots
 using Test
 using ClimaCore
-using LinearAlgebra
-using Plots
-using DifferentialEquations
 if !("." in LOAD_PATH)
     push!(LOAD_PATH, ".")
 end
@@ -16,25 +13,25 @@ import ClimaLSM: name, make_rhs, prognostic_vars
 import ClimaLSM.Domains: coordinates
 
 abstract type AbstractCarbonModel{FT} <: AbstractModel{FT} end
-
-struct BulkThreePools{FT} <: AbstractCarbonModel{FT}
-    live_turnover_rate::FT
-    dead_turnover_rate::Function
+abstract type AbstractRespirationModel{FT <: AbstractFloat} end
+struct BulkThreePools{FT, LRM, DRM} <: AbstractCarbonModel{FT}
+    live_carbon_respiration::LRM
+    dead_carbon_respiration::DRM
     GPP::FT
     "Growth Respiration Term - function of NSC-> live biomass flux"
     R_g::FT
     "Maintenance - depends on climate"
     m_R::FT
-    T_soil::FT
+    T_soil::Function
 end
 
-Base.@kwdef struct Q10Respiration{FT<:AbstractFloat}
+Base.@kwdef struct Q10Respiration{FT} <: AbstractRespirationModel{FT}
     Q10::FT = 2.0
     base_turnover_time::FT = 40.0
     T_ref::FT = 25.0
 end
 
-function turnover_rate(T::FT, resp_model::Q10Respiration) where {FT}
+function turnover_rate(T::FT, resp_model::Q10Respiration{FT}) where {FT}
     (; Q10, base_turnover_time, T_ref) = resp_model
     return Q10 ^((T-T_ref)/FT(10.0))/base_turnover_time
 end
@@ -55,27 +52,27 @@ function ClimaLSM.make_rhs(model::BulkThreePools{FT}) where {FT}
         NPP = @.(model.GPP - model.m_R*Y.carbon.live - model.R_g)
         G = NSC_transfer.(model.GPP)
         @. dY.carbon.NSC = NPP - G
-        @. dY.carbon.live = G - Y.carbon.live*live_turnover_rate
-        @. dY.carbon.dead = Y.carbon.live*live_turnover_rate - Y.carbon.dead*model.turnover_rate(model.T_soil)
+        live_turnover_rate = turnover_rate(model.T_soil(t), model.live_carbon_respiration)
+        dY.carbon.live = G .- Y.carbon.live .*live_turnover_rate
+        dY.carbon.dead = Y.carbon.live .*live_turnover_rate .- Y.carbon.dead .*turnover_rate(model.T_soil(t), model.dead_carbon_respiration)
     end
     return rhs!
 end
 
 # stand in for future function
 function NSC_transfer(GPP::FT) where{FT}
-    return FT(0.1)*GPP
+    return FT(0.8)*GPP
 end
 
-live_turnover_rate = 1.0/10.0 # years
-dead_resp_model = Q10Respiration{Float64}(;Q10 = 2.0, base_turnover_time = 50.0)
-dead_turnover_rate = (T) -> turnover_rate(T, dead_resp_model)
-GPP = 60 # PgC/year
+T_soil = (t) -> eltype(t)(25.0) # C
+live_resp_model = Q10Respiration{Float64}(;Q10 = 2.0, base_turnover_time = 10.0) 
+dead_resp_model = Q10Respiration{Float64}(;Q10 = 2.0, base_turnover_time = 100.0)
+GPP = 60.0 # PgC/year
 m_R = 0.2 # /year
 R_g = 0.0 # PgC/year
-T_soil = 25.0 # C
-carbon = BulkThreePools{Float64}(
-    live_turnover_rate,
-    dead_turnover_rate,
+carbon = BulkThreePools{Float64, typeof(live_resp_model), typeof(dead_resp_model)}(
+    live_resp_model,
+    dead_resp_model,
     GPP,
     R_g,
     m_R,
@@ -90,20 +87,23 @@ ode_function! = make_ode_function(carbon);
 #dY/dt = ode_function(dY,Y,p,t) # updates dY in place
 dY = similar(Y)
 ode_function!(dY, Y, p, 0.0)
-@test sum(abs.(dY.carbon.pool .- [0.0, 0.0])) < 1e-14
+#@test sum(abs.(dY.carbon.pool .- [0.0, 0.0])) < 1e-14
 
 
 t0 = 0.0;
-tf = 1000.0; # years
+tf = 1000.#0; # years
 dt = 1.0; # years
 prob = ODEProblem(ode_function!, Y, (t0, tf), p);
 sol = solve(prob, RK4(); dt = dt, reltol = 1e-6, abstol = 1e-6);
 
 expected = [600.0, 1500.0]
 
-pool1 = [sol.u[k].carbon.pool[1] for k in 1:1:length(sol.t)] # time series
-pool2 = [sol.u[k].carbon.pool[2] for k in 1:1:length(sol.t)]
-plot(sol.t, pool1)
+NSC = [sol.u[k].carbon.NSC[1] for k in 1:1:length(sol.t)]
+live = [sol.u[k].carbon.live[1] for k in 1:1:length(sol.t)] # time series
+dead = [sol.u[k].carbon.dead[1] for k in 1:1:length(sol.t)]
+plot(sol.t, live)
+plot!(sol.t, dead)
+plot!(sol.t,NSC)
 # Follow up
 # [X] Test steady state solution, look at time evolution plot
 # time-varying NPP
