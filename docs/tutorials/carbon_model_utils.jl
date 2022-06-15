@@ -1,8 +1,10 @@
 abstract type AbstractCarbonModel{FT} <: AbstractModel{FT} end
 abstract type AbstractRespirationModel{FT <: AbstractFloat} end
-struct BulkThreePools{FT, LRM, DRM} <: AbstractCarbonModel{FT}
+abstract type AbstractNSCOutputModel{FT <: AbstractFloat} end
+struct BulkThreePools{FT, LRM, DRM, AN} <: AbstractCarbonModel{FT}
     live_carbon_respiration::LRM
     dead_carbon_respiration::DRM
+    nsc_transfer_model::AN
     GPP::FT
     "Growth Respiration Term - function of NSC-> live biomass flux"
     R_g::FT
@@ -10,6 +12,27 @@ struct BulkThreePools{FT, LRM, DRM} <: AbstractCarbonModel{FT}
     m_R::FT
     T_soil::Function
 end
+
+function BulkThreePools{FT}(; live_carbon_respiration, dead_carbon_respiration, nsc_transfer_model, GPP::FT, R_g::FT, m_R::FT, T_soil) where {FT}
+    type_args = typeof.((live_carbon_respiration, dead_carbon_respiration, nsc_transfer_model))
+    args = (live_carbon_respiration, dead_carbon_respiration, nsc_transfer_model, GPP, R_g, m_R, T_soil)
+    return BulkThreePools{FT, type_args...}(args...)
+end
+
+struct MichaelisMenten{FT} <: AbstractNSCOutputModel{FT}
+    Vmax::FT
+    Km::FT
+end
+
+function nsc_transfer(NSC::FT, model::MichaelisMenten{FT}) where {FT}
+    if NSC > FT(0.0)
+        model.Vmax * NSC / (NSC + model.Km)
+    else
+        FT(0.0)
+    end
+
+end
+
 
 Base.@kwdef struct Q10Respiration{FT} <: AbstractRespirationModel{FT}
     Q10::FT = 2.0
@@ -30,26 +53,19 @@ ClimaLSM.prognostic_vars(::BulkThreePools) = (:NSC, :live, :dead)
 ClimaLSM.Domains.coordinates(model::BulkThreePools{FT}) where {FT} =
     FT.([0.0]);
 
+function compute_NPP(model::BulkThreePools{FT}, live) where{FT}
+    return model.GPP - model.m_R*live - model.R_g
+end
+
 function ClimaLSM.make_rhs(model::BulkThreePools{FT}) where {FT}
     function rhs!(dY, Y, p, t) # gets the entire Y
-        # NPP = GPP - R_m - R_g
-        # G = function (x1,x2, phen, environment)
-
-        NPP = @.(model.GPP - model.m_R*Y.carbon.live - model.R_g)
-        G = NSC_transfer.(model, Y.carbon.NSC)
-        if Y.carbon.NSC < G > dY.carbon.NSC:
-            G = dY.carbon.NSC
-        @. dY.carbon.NSC = NPP - G
+        G = nsc_transfer.(Y.carbon.NSC, Ref(model.nsc_transfer_model))
+        dY.carbon.NSC = compute_NPP.(Ref(model), Y.carbon.live) .- G 
         live_turnover_rate = turnover_rate(model.T_soil(t), model.live_carbon_respiration)
         dY.carbon.live = G .- Y.carbon.live .*live_turnover_rate
         dY.carbon.dead = Y.carbon.live .*live_turnover_rate .- Y.carbon.dead .*turnover_rate(model.T_soil(t), model.dead_carbon_respiration)
     end
     return rhs!
-end
-
-# stand in for future function
-function NSC_transfer(model::BulkThreePools{FT}, NSC) where{FT}
-    return FT(0.8)*GPP
 end
 
 #=
