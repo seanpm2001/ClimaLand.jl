@@ -50,6 +50,7 @@ An abstract type of radiative drivers of the bucket model.
 """
 abstract type AbstractRadiativeDrivers{FT <: AbstractFloat} end
 abstract type AbstractLandAlbedoModel{FT <: AbstractFloat} end
+abstract type AbstractSnowMeltModel{FT <: AbstractFloat} end
 
 """
     BulkAlbedo{FT} <: AbstractLandAlbedoModel
@@ -65,6 +66,17 @@ struct BulkAlbedo{FT} <: AbstractLandAlbedoModel{FT}
     α_soil::Function
 end
 
+"""
+"""
+struct SnowTemperatureMeltModel{FT} <: AbstractSnowMeltModel{FT}
+    τ::FT
+end
+
+"""
+"""
+struct SurfaceFluxMeltModel{FT} <: AbstractSnowMeltModel{FT}
+    τ::FT
+end
 
 
 ClimaLSM.name(::AbstractBucketModel) = :bucket
@@ -102,8 +114,6 @@ struct BucketModelParameters{
     z_0m::FT
     "Roughness length for scalars (m)"
     z_0b::FT
-    "τc timescale on which snow melts"
-    τc::FT
     "Earth Parameter set; physical constants, etc"
     earth_param_set::PSE
 end
@@ -118,7 +128,6 @@ BucketModelParameters(
     W_f::FT,
     z_0m::FT,
     z_0b::FT,
-    τc::FT,
     earth_param_set::PSE,
 ) where {FT, AAM, PSE} = BucketModelParameters{FT, AAM, PSE}(
     d_soil,
@@ -130,7 +139,6 @@ BucketModelParameters(
     W_f,
     z_0m,
     z_0b,
-    τc,
     earth_param_set,
 )
 
@@ -208,6 +216,7 @@ PrescribedRadiativeFluxes(FT, SW_d, LW_d) =
          PS <: BucketModelParameters{FT},
          ATM <: AbstractAtmosphericDrivers{FT},
          RAD <: AbstractRadiativeDrivers{FT},
+         SMM <: AbstractSnowMeltModel{FT},
          D,
      } <: AbstractBucketModel{FT}
 
@@ -221,6 +230,7 @@ struct BucketModel{
     PS <: BucketModelParameters{FT},
     ATM <: AbstractAtmosphericDrivers{FT},
     RAD <: AbstractRadiativeDrivers{FT},
+    SMM <: AbstractSnowMeltModel{FT},
     D,
 } <: AbstractBucketModel{FT}
     "Parameters required by the bucket model"
@@ -229,6 +239,8 @@ struct BucketModel{
     atmos::ATM
     "The radiation drivers: Prescribed or Coupled"
     radiation::RAD
+    "The snow melt model"
+    snowmelt::SMM
     "The domain of the model"
     domain::D
 end
@@ -238,8 +250,9 @@ function BucketModel(;
     domain::ClimaLSM.Domains.AbstractDomain,
     atmosphere::ATM,
     radiation::RAD,
-) where {FT, PSE, ATM, RAD}
-    args = (parameters, atmosphere, radiation, domain)
+    snowmelt::SMM,
+) where {FT, PSE, ATM, RAD, SMM}
+    args = (parameters, atmosphere, radiation, snowmelt, domain)
     BucketModel{FT, typeof.(args)...}(args...)
 end
 
@@ -385,14 +398,12 @@ function make_rhs(model::BucketModel{FT}) where {FT}
 
         partitioned_fluxes =
             partition_surface_fluxes.(
+                Ref(model.snowmelt),
                 Y.bucket.σS,
                 Y.bucket.T_sfc,
-                model.parameters.τc,
-                snow_cover_fraction,
                 E,
                 F_sfc,
-                _LH_f0,
-                _T_freeze,
+                Ref(model.parameters),
             )
         (; F_melt, F_into_snow, G) = partitioned_fluxes
 
