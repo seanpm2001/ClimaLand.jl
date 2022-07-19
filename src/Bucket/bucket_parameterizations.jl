@@ -27,16 +27,34 @@ function melt_timescale(σS::FT, LH_f0::FT, τc::FT, F_sfc::FT, E::FT) where {FT
     return max(τc, -σS * LH_f0 / (F_sfc + LH_f0 * E))
 end
 
+"""
+    partition_surface_fluxes(
+        σS::FT,
+        T_sfc::FT,
+        τc::FT,
+        snow_cover_fraction::FT,
+        E::FT,
+        F_sfc::FT,
+        _LH_f0::FT,
+        _T_freeze::FT,
+    ) where{FT}
+
+Partitions the surface fluxes in a flux for melting snow, a flux for sublimating snow,
+and a ground heat flux. 
+
+All fluxes are positive if they are in the direction from land towards
+the atmosphere.
+"""
 function partition_surface_fluxes(
-    σS,
-    T_sfc,
-    τc,
-    snow_cover_fraction,
-    E,
-    F_sfc,
-    _LH_f0,
-    _T_freeze,
-)
+    σS::FT,
+    T_sfc::FT,
+    τc::FT,
+    snow_cover_fraction::FT,
+    E::FT,
+    F_sfc::FT,
+    _LH_f0::FT,
+    _T_freeze::FT,
+) where {FT}
     τ = melt_timescale(σS, _LH_f0, τc, F_sfc, E) # Eqn 23
     F_melt = -σS * _LH_f0 * heaviside(T_sfc - _T_freeze) / τ # Eqn 22. Negative by definition (into the snow/land).
     F_into_snow = -_LH_f0 * E * snow_cover_fraction + F_melt # F_melt is already multiplied by σS. Eqn 20
