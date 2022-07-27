@@ -9,8 +9,8 @@ if !("." in LOAD_PATH)
     push!(LOAD_PATH, ".")
 end
 using ClimaLSM
-using ClimaLSM.Domains: RootDomain
 using ClimaLSM.Roots
+using ClimaLSM.Roots: RootDomain
 
 FT = Float64
 
@@ -28,7 +28,7 @@ FT = Float64
     z_bottom_stem = FT(0.0)
     struct EarthParameterSet <: AbstractEarthParameterSet end
     earth_param_set = EarthParameterSet()
-    root_domain = RootDomain{FT}(z_root_depths, [z_bottom_stem, z_leaf])
+    root_domain = RootDomain{FT}(z_root_depths, [z_bottom_stem, z_leaf], z_bottom_stem)
     param_set = Roots.RootsParameters{FT, typeof(earth_param_set)}(
         a_root,
         b_root,
@@ -103,9 +103,9 @@ FT = Float64
     theta_leaf_0 = p_to_theta(p_leaf_ini)
     y1_0 = FT(theta_stem_0 * size_reservoir_stem_moles)
     y2_0 = FT(theta_leaf_0 * size_reservoir_leaf_moles)
-    y0 = [y1_0, y2_0]
     Y, p, coords = initialize(roots)
-    Y.vegetation.rwc .= y0
+    initial_conditions(coords, y1_0, y2_0) = (y1_0, y2_0)
+    Y.vegetation.rwc .= initial_conditions.(coords, y1_0, y2_0)
 
     root_ode! = make_ode_function(roots)
 

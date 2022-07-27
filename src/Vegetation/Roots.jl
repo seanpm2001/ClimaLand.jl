@@ -170,7 +170,7 @@ A function which returns the names of the prognostic
 variables of the `RootsModel`.
 """
 prognostic_vars(model::RootsModel) = (:rwc,)
-prognostic_types(model::RootsModel{FT}) where {FT} = (NTuple{2, FT},)
+prognostic_types(model::RootsModel{FT}) where {FT} = (NTuple{length(model.domain.compartment_heights), FT},)
 """
     function flow(
         z1::FT,
@@ -297,11 +297,35 @@ function make_rhs(model::RootsModel)
 
         z_stem, z_leaf = model.domain.compartment_heights
 
-        p_stem = theta_to_p(Y.vegetation.rwc[1] / size_reservoir_stem_moles)
+        # # size_reservoirs = (size_reservoir_stem_moles, size_reservoir_leaf_moles)
+        # # p_?? = theta_to_p.(Y.vegetation.rwc ./ size_reservoirs)
+        # # can we loop over the compartments only once?
+        # d(v1)/dt = Flux(0)-Flux(1)
+        # d(v2)/dt = Flux(1) - Flux(2)
+
+        # Flux(0) BC
+        # Flux(1) = f(v1,v2' params of 1 and 2)
+        # d[i]/ dt = F
+        # f]i+1]/dt += -F
+
+        p_stem = theta_to_p(Y.vegetation.rwc / size_reservoir_stem_moles)
         p_leaf = theta_to_p(Y.vegetation.rwc[2] / size_reservoir_leaf_moles)
 
         # Flows are in moles/second
         flow_in_stem = flow_out_roots(model.root_extraction, model, Y, p, t)
+
+        # function f(rwc, reservoir_sizes)
+
+        #     for i = 1:N
+        #         rwcX = getproperty(rwc, i)[]
+        #         ...
+        #         setproperty!(drwc, i, val)
+        #     end
+        #     map(rwc) do c
+        #         c
+
+        #     end
+        # end
 
         flow_out_stem = flow(
             z_stem,
