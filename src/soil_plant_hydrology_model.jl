@@ -53,10 +53,9 @@ function SoilPlantHydrologyModel{FT}(;
     SM <: Soil.AbstractSoilModel{FT},
     VM <: PlantHydraulics.AbstractVegetationModel{FT},
 }
-
     #These may be passed in, or set, depending on use scenario
-    boundary_fluxes = FluxBC{FT}(FT(0.0), FT(0.0))
-    transpiration = PrescribedTranspiration{FT}((t::FT) -> FT(0.0))
+    boundary_fluxes = soil_args.boundary_conditions #FluxBC{FT}(FT(0.0), FT(0.0))
+    transpiration = vegetation_args.transpiration #PrescribedTranspiration{FT}((t::FT) -> FT(0.0))
 
     ##These should always be set by the constructor.
     sources = (RootExtraction{FT}(),)
@@ -102,8 +101,44 @@ function make_interactions_update_aux(#Do we want defaults, for land::AbstractLa
     RM <: PlantHydraulics.PlantHydraulicsModel{FT},
 }
     function update_aux!(p, Y, t)
-        @. p.root_extraction = FT(0.0)
-        ##Science goes here
+        @unpack plant_vg_α, plant_vg_n, plant_vg_m, plant_ν, plant_S_s, plant_K_sat = land.vegetation.parameters
+        #@show(land.vegetation.domain.root_depths)
+        #@show(typeof(land.vegetation.domain.root_depths))
+        #@show(land.soil.domain)
+        #@show(land.soil.domain.zlim)
+        #@show(p.soil.ψ)
+        @. p.root_extraction =    
+        PlantHydraulics.flux.(
+                land.vegetation.domain.root_depths, #land.soil.domain.zlim[1], #, #soil.coordinates.z, #
+                land.vegetation.domain.compartment_midpoints[1],
+                p.soil.ψ,
+                PlantHydraulics.water_retention_curve(plant_vg_α,plant_vg_n,plant_vg_m,PlantHydraulics.effective_saturation(plant_ν,Y.vegetation.ϑ_l[1]),plant_ν,plant_S_s),               
+                plant_vg_α,
+                plant_vg_n,
+                plant_vg_m,
+                plant_ν,
+                plant_S_s,
+                plant_K_sat[:root],
+                plant_K_sat[land.vegetation.domain.compartment_labels[1]],
+        ).*
+        land.vegetation.parameters.root_distribution.(land.vegetation.domain.root_depths) #land.vegetation.domain.root_depths land.soil.coordinates.z,) 
+        #=
+        @. p.root_extraction =
+            Roots.ground_area_flux.(
+                # we have to use coordinates here rather than root depth array to avoid broadcast error? 
+                land.soil.coordinates.z,
+                land.vegetation.domain.compartment_heights[1],
+                p.soil.ψ .* FT(9800), # Pa: ρg * meters
+                Roots.θ_to_p(Y.vegetation.θ[1]),
+                a_root,
+                b_root,
+                K_max_root,
+                land.vegetation.param_set.RAI,
+            ) .*
+            land.vegetation.param_set.root_distribution_function.(
+                land.soil.coordinates.z,
+            )
+            =#
     end
     return update_aux!
 end

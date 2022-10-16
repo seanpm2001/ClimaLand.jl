@@ -115,17 +115,19 @@ struct PlantHydraulicsParameters{FT <: AbstractFloat, PSE}
     "RAI, SAI, LAI in [m2 m-2]"
     area_index::NamedTuple{(:root, :stem, :leaf), Tuple{FT, FT, FT}}
     "water conductivity in the different plant compartments (m/s) when pressure is zero, a maximum"
-    K_sat::NamedTuple{(:root, :stem, :leaf), Tuple{FT, FT, FT}}
+    plant_K_sat::NamedTuple{(:root, :stem, :leaf), Tuple{FT, FT, FT}}
     "van Genuchten parameter"
-    vg_α::FT
+    plant_vg_α::FT
     "van Genuchten parameter"
-    vg_n::FT
+    plant_vg_n::FT
     "van Genuchten parameter"
-    vg_m::FT
+    plant_vg_m::FT
     "porosity"
-    ν::FT
+    plant_ν::FT
     "storativity"
-    S_s::FT
+    plant_S_s::FT
+    "Root distribution function P(z)"
+    root_distribution::Function
     "Physical Constants and other Clima-wide parameters"
     earth_param_set::PSE
 end
@@ -176,13 +178,13 @@ prognostic_types(model::PlantHydraulicsModel{FT}) where {FT} = (FT,)
         z2,
         p1,
         p2,
-        vg_α,
-        vg_n,
-        vg_m,
-        ν,
-        S_s,
-        K_sat1,
-        K_sat2,
+        plant_vg_α,
+        plant_vg_n,
+        plant_vg_m,
+        plant_ν,
+        plant_S_s,
+        plant_K_sat1,
+        plant_K_sat2,
 ) where {FT} 
 Computes the water flux given 1) the absolute pressure at two points located
 at z1 and z2, corresponding here to the middle of each compartment 
@@ -198,22 +200,22 @@ function flux(
     z2,
     p1,
     p2,
-    vg_α,
-    vg_n,
-    vg_m,
-    ν,
-    S_s,
-    K_sat1,
-    K_sat2,
+    plant_vg_α,
+    plant_vg_n,
+    plant_vg_m,
+    plant_ν,
+    plant_S_s,
+    plant_K_sat1,
+    plant_K_sat2,
 ) where {FT}
 
-    S_l1 = inverse_water_retention_curve(vg_α, vg_n, vg_m, p1, ν, S_s)
-    S_l2 = inverse_water_retention_curve(vg_α, vg_n, vg_m, p2, ν, S_s)
+    S_l1 = inverse_water_retention_curve(plant_vg_α, plant_vg_n, plant_vg_m, p1, plant_ν, plant_S_s)
+    S_l2 = inverse_water_retention_curve(plant_vg_α, plant_vg_n, plant_vg_m, p2, plant_ν, plant_S_s)
 
-    K1_p1 = hydraulic_conductivity(K_sat1, vg_m, S_l1)
-    K2_p2 = hydraulic_conductivity(K_sat2, vg_m, S_l2)
+    plant_K1_p1 = hydraulic_conductivity(plant_K_sat1, plant_vg_m, S_l1)
+    plant_K2_p2 = hydraulic_conductivity(plant_K_sat2, plant_vg_m, S_l2)
 
-    flux = -(K1_p1 + K2_p2) / 2 * ((p2 - p1) / (z2 - z1) + 1)
+    flux = -(plant_K1_p1 + plant_K2_p2) / 2 * ((p2 - p1) / (z2 - z1) + 1)
 
     return flux # units of [m s-1]
 end
@@ -224,18 +226,18 @@ end
 A point-wise function returning the hydraulic conductivity, using the
 van Genuchten formulation.
 """
-function hydraulic_conductivity(K_sat::FT, m::FT, S::FT) where {FT}
+function hydraulic_conductivity(plant_K_sat::FT, m::FT, S::FT) where {FT}
     if S < FT(1)
         K = sqrt(S) * (FT(1) - (FT(1) - S^(FT(1) / m))^m)^FT(2)
     else
         K = FT(1)
     end
-    return K * K_sat
+    return K * plant_K_sat
 end
 
 """
     augmented_liquid_fraction(
-        ν::FT, 
+        plant_ν::FT, 
         S_l::FT) where {FT}
 Computes the augmented liquid fraction from porosity and
 effective saturation. Augmented liquid fraction allows for
@@ -243,78 +245,78 @@ oversaturation: an expansion of the volume of space
 available for storage in a plant compartment. It is analogous
 to the augmented liquid fraction state variable in the soil model.
 """
-function augmented_liquid_fraction(ν::FT, S_l::FT) where {FT}
-    ϑ_l = S_l * ν # ϑ_l can be > ν
+function augmented_liquid_fraction(plant_ν::FT, S_l::FT) where {FT}
+    ϑ_l = S_l * plant_ν # ϑ_l can be > ν
     safe_ϑ_l = max(ϑ_l, 0)
     return safe_ϑ_l # units of [m3 m-3]
 end
 
 """
     effective_saturation(
-        ν::FT, 
+        plant_ν::FT, 
         ϑ_l::FT) where {FT}
 Computes the effective saturation (volumetric water content relative to
 porosity).
 """
-function effective_saturation(ν::FT, ϑ_l::FT) where {FT}
-    S_l = ϑ_l / ν # S_l can be > 1
+function effective_saturation(plant_ν::FT, ϑ_l::FT) where {FT}
+    S_l = ϑ_l / plant_ν # S_l can be > 1
     safe_S_l = max(S_l, 0)
     return safe_S_l # units of [m3 m-3]
 end
 
 """
     water_retention_curve(
-        vg_α::FT,
-        vg_n::FT,
-        vg_m::FT,
+        plant_vg_α::FT,
+        plant_vg_n::FT,
+        plant_vg_m::FT,
         S_l::FT,
-        ν::FT,
-        S_s::FT) where {FT}
+        plant_ν::FT,
+        plant_S_s::FT) where {FT}
 Converts augmented liquid fraction (ϑ_l) to effective saturation 
 (S_l), and then effective saturation to absolute pressure (p), 
 for both the unsaturated and saturated regimes. Note pressure 
 is in SI units [m].
 """
 function water_retention_curve(
-    vg_α::FT,
-    vg_n::FT,
-    vg_m::FT,
+    plant_vg_α::FT,
+    plant_vg_n::FT,
+    plant_vg_m::FT,
     S_l::FT,
-    ν::FT,
-    S_s::FT,
+    plant_ν::FT,
+    plant_S_s::FT,
 ) where {FT}
     if S_l <= FT(1.0)
-        p = -((S_l^(-FT(1) / vg_m) - FT(1)) * vg_α^(-vg_n))^(FT(1) / vg_n)
+        p = -((S_l^(-FT(1) / plant_vg_m) - FT(1)) * plant_vg_α^(-plant_vg_n))^(FT(1) / plant_vg_n)
     else
-        ϑ_l = augmented_liquid_fraction(ν, S_l)
-        p = (ϑ_l - ν) / S_s
+        ϑ_l = augmented_liquid_fraction(plant_ν, S_l)
+        p = (ϑ_l - plant_ν) / plant_S_s
     end
     return p # units of (m)
 end
 
 """
     inverse_water_retention_curve(
-        vg_α::FT,
-        vg_n::FT,
-        vg_m::FT,
+        plant_vg_α::FT,
+        plant_vg_n::FT,
+        plant_vg_m::FT,
         p::FT,
-        ν::FT,
-        S_s::FT) where {FT}
+        plant_ν::FT,
+        plant_S_s::FT) where {FT}
 Converts absolute pressure (p) to effective saturation (S_l).
 """
 function inverse_water_retention_curve(
-    vg_α::FT,
-    vg_n::FT,
-    vg_m::FT,
+    plant_vg_α::FT,
+    plant_vg_n::FT,
+    plant_vg_m::FT,
     p::FT,
-    ν::FT,
-    S_s::FT,
+    plant_ν::FT,
+    plant_S_s::FT,
 ) where {FT}
     if p <= FT(0.0)
-        S_l = ((-vg_α * p)^vg_n + FT(1.0))^(-vg_m)
+        S_l = ((-plant_vg_α * p)^plant_vg_n + FT(1.0))^(-plant_vg_m)
     else
-        ϑ_l = p * S_s + ν
-        S_l = effective_saturation(ν, ϑ_l)
+        ϑ_l = p * plant_S_s + plant_ν
+        S_l = effective_saturation(plant_ν, ϑ_l)
     end
     return S_l
 end
@@ -326,13 +328,13 @@ The rhs! function must comply with a rhs function of OrdinaryDiffEq.jl.
 """
 function make_rhs(model::PlantHydraulicsModel)
     function rhs!(dY, Y, p, t)
-        @unpack vg_α, vg_n, vg_m, S_s, ν, K_sat, area_index = model.parameters
+        @unpack plant_vg_α, plant_vg_n, plant_vg_m, plant_S_s, plant_ν, plant_K_sat, area_index = model.parameters
 
         n_stem = model.domain.n_stem
         n_leaf = model.domain.n_leaf
 
-        S_l = effective_saturation.(ν, Y.vegetation.ϑ_l)
-        pressure = water_retention_curve.(vg_α, vg_n, vg_m, S_l, ν, S_s)
+        S_l = effective_saturation.(plant_ν, Y.vegetation.ϑ_l)
+        pressure = water_retention_curve.(plant_vg_α, plant_vg_n, plant_vg_m, S_l, plant_ν, plant_S_s)
         for i in 1:(n_stem + n_leaf)
             if i == 1
                 flux_in = flux_out_roots(model.root_extraction, model, Y, p, t)
@@ -343,13 +345,13 @@ function make_rhs(model::PlantHydraulicsModel)
                     model.domain.compartment_midpoints[i],
                     pressure[i - 1],
                     pressure[i],
-                    vg_α,
-                    vg_n,
-                    vg_m,
-                    ν,
-                    S_s,
-                    K_sat[model.domain.compartment_labels[i - 1]],
-                    K_sat[model.domain.compartment_labels[i]],
+                    plant_vg_α,
+                    plant_vg_n,
+                    plant_vg_m,
+                    plant_ν,
+                    plant_S_s,
+                    plant_K_sat[model.domain.compartment_labels[i - 1]],
+                    plant_K_sat[model.domain.compartment_labels[i]],
                 )
                 area_index_in =
                     (
@@ -359,7 +361,7 @@ function make_rhs(model::PlantHydraulicsModel)
             end
 
             if i == (n_stem + n_leaf)
-                flux_out = transpiration(model.transpiration, t)
+                flux_out = transpiration(model, model.transpiration, t)
                 area_index_out = area_index[:leaf] # assuming at least 1 leaf compartment
             else
                 flux_out = flux(
@@ -367,13 +369,13 @@ function make_rhs(model::PlantHydraulicsModel)
                     model.domain.compartment_midpoints[i + 1],
                     pressure[i],
                     pressure[i + 1],
-                    vg_α,
-                    vg_n,
-                    vg_m,
-                    ν,
-                    S_s,
-                    K_sat[model.domain.compartment_labels[i]],
-                    K_sat[model.domain.compartment_labels[i + 1]],
+                    plant_vg_α,
+                    plant_vg_n,
+                    plant_vg_m,
+                    plant_ν,
+                    plant_S_s,
+                    plant_K_sat[model.domain.compartment_labels[i]],
+                    plant_K_sat[model.domain.compartment_labels[i + 1]],
                 )
                 area_index_out =
                     (
@@ -432,45 +434,55 @@ function flux_out_roots(
     p::ClimaCore.Fields.FieldVector,
     t::FT,
 )::FT where {FT}
-    @unpack vg_α, vg_n, vg_m, ν, S_s, K_sat = model.parameters
+    @unpack plant_vg_α, plant_vg_n, plant_vg_m, plant_ν, plant_S_s, plant_K_sat = model.parameters
 
-    S_l_stem = effective_saturation(ν, Y.vegetation.ϑ_l[1])
+    S_l_stem = effective_saturation(plant_ν, Y.vegetation.ϑ_l[1])
 
     #How to ungeneralize
 
-    p_stem = water_retention_curve.(vg_α, vg_n, vg_m, S_l_stem, ν, S_s)
+    p_stem = water_retention_curve.(plant_vg_α, plant_vg_n, plant_vg_m, S_l_stem, plant_ν, plant_S_s)
     return sum(
         flux.(
-            model.domain.root_depths,
+            model.domain.root_depths[1],
             model.domain.compartment_midpoints[1],
             re.p_soil(t),
             p_stem,
-            vg_α,
-            vg_n,
-            vg_m,
-            ν,
-            S_s,
-            K_sat[:root],
-            K_sat[model.domain.compartment_labels[1]],
-        ),
+            plant_vg_α,
+            plant_vg_n,
+            plant_vg_m,
+            plant_ν,
+            plant_S_s,
+            plant_K_sat[:root],
+            plant_K_sat[model.domain.compartment_labels[1]],
+    ).*
+    model.parameters.root_distribution_function.(model.domain.root_depths[1]).* 
+    (
+        vcat(model.domain.root_depths, [0.0])[2:end] -
+        vcat(model.domain.root_depths, [0.0])[1:(end - 1)]
+    ),
     )
 end
 
 """
-    transpiration(
+    transpiration(model::PlantHydraulicsModel{FT},
         transpiration::PrescribedTranspiration{FT},
         t::FT,
     )::FT where {FT}
-A method which computes the transpiration in meters/sec between the leaf
-and the atmosphere,
-in the case of a standalone plant hydraulics model with prescribed
-transpiration rate.
+A method which computes the transpiration per ground area in volume of 
+water/ground area/second (m/s) between the top leaf
+compartment and the atmosphere, in the case of a standalone PlantHydraulics
+model with a prescribed transpiration rate and LAI.
 """
 function transpiration(
+    model::PlantHydraulicsModel{FT},
     transpiration::PrescribedTranspiration{FT},
     t::FT,
 )::FT where {FT}
-    return transpiration.T(t)
+    return transpiration.T(t) * model.parameters.area_index[:leaf]
 end
 
 end
+
+
+
+

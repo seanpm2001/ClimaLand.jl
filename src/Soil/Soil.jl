@@ -79,6 +79,7 @@ export RichardsModel,
     EnergyHydrologyParameters,
     boundary_fluxes,
     FluxBC,
+    PrecipFreeDrainage,
     RootExtraction,
     AbstractSoilModel,
     AbstractSoilSource,
@@ -178,6 +179,10 @@ struct FluxBC{FT} <: AbstractSoilBoundaryConditions{FT}
     bot_flux_bc::FT
 end
 
+struct PrecipFreeDrainage{FT} <: AbstractSoilBoundaryConditions{FT}
+    top_flux_bc::Function
+end
+
 """
     boundary_fluxes(bc::FluxBC, _...)
 
@@ -190,6 +195,9 @@ a flux before being applied as a boundary condition.
 """
 function boundary_fluxes(bc::FluxBC, _...)
     return bc.top_flux_bc, bc.bot_flux_bc
+end
+function boundary_fluxes(bc::PrecipFreeDrainage, p, t)
+    return bc.top_flux_bc(t), -parent(p.soil.K)[1]
 end
 
 """

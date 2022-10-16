@@ -6,31 +6,31 @@ $(DocStringExtensions.FIELDS)
 """
 struct RichardsParameters{FT <: AbstractFloat}
     "The porosity of the soil (m^3/m^3)"
-    ν::FT
+    soil_ν::FT
     "The van Genuchten parameter α (1/m)"
-    vg_α::FT
+    soil_vg_α::FT
     "The van Genuchten parameter n"
-    vg_n::FT
+    soil_vg_n::FT
     "The van Genuchten parameter m"
-    vg_m::FT
+    soil_vg_m::FT
     "The saturated hydraulic conductivity (m/s)"
-    K_sat::FT
+    soil_K_sat::FT
     "The specific storativity (1/m)"
-    S_s::FT
+    soil_S_s::FT
     "The residual water fraction (m^3/m^3"
     θ_r::FT
 end
 
 function RichardsParameters(;
-    ν::FT,
-    vg_α::FT,
-    vg_n::FT,
-    vg_m::FT,
-    K_sat::FT,
-    S_s::FT,
+    soil_ν::FT,
+    soil_vg_α::FT,
+    soil_vg_n::FT,
+    soil_vg_m::FT,
+    soil_K_sat::FT,
+    soil_S_s::FT,
     θ_r::FT,
 ) where {FT}
-    return RichardsParameters{FT}(ν, vg_α, vg_n, vg_m, K_sat, S_s, θ_r)
+    return RichardsParameters{FT}(soil_ν, soil_vg_α, soil_vg_n, soil_vg_m, soil_K_sat, soil_S_s, θ_r)
 end
 
 """
@@ -87,7 +87,7 @@ This has been written so as to work with Differential Equations.jl.
 """
 function ClimaLSM.make_rhs(model::RichardsModel)
     function rhs!(dY, Y, p, t)
-        @unpack ν, vg_α, vg_n, vg_m, K_sat, S_s, θ_r = model.parameters
+        @unpack soil_ν, soil_vg_α, soil_vg_n, soil_vg_m, soil_K_sat, soil_S_s, θ_r = model.parameters
         top_flux_bc, bot_flux_bc =
             boundary_fluxes(model.boundary_conditions, p, t)
         z = ClimaCore.Fields.coordinate_field(model.domain.space).z
@@ -187,13 +187,13 @@ This has been written so as to work with Differential Equations.jl.
 """
 function ClimaLSM.make_update_aux(model::RichardsModel)
     function update_aux!(p, Y, t)
-        @unpack ν, vg_α, vg_n, vg_m, K_sat, S_s, θ_r = model.parameters
+        @unpack soil_ν, soil_vg_α, soil_vg_n, soil_vg_m, soil_K_sat, soil_S_s, θ_r = model.parameters
         @. p.soil.K = hydraulic_conductivity(
-            K_sat,
-            vg_m,
-            effective_saturation(ν, Y.soil.ϑ_l, θ_r),
+            soil_K_sat,
+            soil_vg_m,
+            effective_saturation(soil_ν, Y.soil.ϑ_l, θ_r),
         )
-        @. p.soil.ψ = pressure_head(vg_α, vg_n, vg_m, θ_r, Y.soil.ϑ_l, ν, S_s)
+        @. p.soil.ψ = pressure_head(soil_vg_α, soil_vg_n, soil_vg_m, θ_r, Y.soil.ϑ_l, soil_ν, soil_S_s)
     end
     return update_aux!
 end
