@@ -53,7 +53,7 @@ function SoilPlantHydrologyModel{FT}(;
     SM <: Soil.AbstractSoilModel{FT},
     VM <: PlantHydraulics.AbstractVegetationModel{FT},
 }
-    #These may be passed in, or set, depending on use scenario
+    # These may be passed in, or set, depending on use scenario
     boundary_fluxes = soil_args.boundary_conditions #FluxBC{FT}(FT(0.0), FT(0.0))
     transpiration = vegetation_args.transpiration #PrescribedTranspiration{FT}((t::FT) -> FT(0.0))
 
@@ -106,10 +106,25 @@ function make_interactions_update_aux(#Do we want defaults, for land::AbstractLa
         #@show(typeof(land.vegetation.domain.root_depths))
         #@show(land.soil.domain)
         #@show(land.soil.domain.zlim)
-        #@show(p.soil.ψ)
-        @. p.root_extraction =    
+        #@show(land.vegetation.domain.root_depths)        
+        #@show(land.vegetation.domain.compartment_midpoints[1])
+        @show(p.soil.ψ)
+        @show(Y.vegetation.ϑ_l)
+        @show(Y.soil.ϑ_l)
+        @show(PlantHydraulics.effective_saturation.(plant_ν,Y.vegetation.ϑ_l))
+        @show(PlantHydraulics.water_retention_curve.(plant_vg_α,plant_vg_n,plant_vg_m,PlantHydraulics.effective_saturation.(plant_ν,Y.vegetation.ϑ_l),plant_ν,plant_S_s))               
+        @show(plant_vg_α)
+        @show(plant_vg_n)
+        @show(plant_vg_m)
+        @show(plant_ν)
+        @show(plant_S_s)
+        @show(plant_K_sat[:root])
+        @show(plant_K_sat[land.vegetation.domain.compartment_labels[1]])
+        @show(ClimaCore.Fields.coordinate_field(land.soil.domain.space).z)
+
+        @. p.root_extraction = FT(0.0)
         PlantHydraulics.flux.(
-                land.vegetation.domain.root_depths, #land.soil.domain.zlim[1], #, #soil.coordinates.z, #
+                ClimaCore.Fields.coordinate_field(land.soil.domain.space).z, #land.soil.domain.zlim[1], #, #soil.coordinates.z, #
                 land.vegetation.domain.compartment_midpoints[1],
                 p.soil.ψ,
                 PlantHydraulics.water_retention_curve(plant_vg_α,plant_vg_n,plant_vg_m,PlantHydraulics.effective_saturation(plant_ν,Y.vegetation.ϑ_l[1]),plant_ν,plant_S_s),               
@@ -121,7 +136,8 @@ function make_interactions_update_aux(#Do we want defaults, for land::AbstractLa
                 plant_K_sat[:root],
                 plant_K_sat[land.vegetation.domain.compartment_labels[1]],
         ).*
-        land.vegetation.parameters.root_distribution.(land.vegetation.domain.root_depths) #land.vegetation.domain.root_depths land.soil.coordinates.z,) 
+        land.vegetation.parameters.root_distribution.(ClimaCore.Fields.coordinate_field(land.soil.domain.space).z) #land.vegetation.domain.root_depths land.soil.coordinates.z,) 
+        
         #=
         @. p.root_extraction =
             Roots.ground_area_flux.(
@@ -138,7 +154,7 @@ function make_interactions_update_aux(#Do we want defaults, for land::AbstractLa
             land.vegetation.param_set.root_distribution_function.(
                 land.soil.coordinates.z,
             )
-            =#
+        =#
     end
     return update_aux!
 end

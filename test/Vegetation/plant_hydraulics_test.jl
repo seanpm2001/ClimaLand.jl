@@ -25,8 +25,8 @@ FT = Float64
     K_sat = (root = FT(1e-5), stem = FT(1e-3), leaf = FT(1e-3))# (accelerated) see Kumar, 2008 and
     # Pierre's database for total global plant conductance (1/resistance) 
     # (https://github.com/yalingliu-cu/plant-strategies/blob/master/Product%20details.pdf)
-    vg_α = FT(0.24) # Fitted VG to Weibull curve parameters found in Venturas, 2018
-    vg_n = FT(2)
+    vg_α = FT(0.06) # Fitted VG to Weibull curve parameters found in Venturas, 2018
+    vg_n = FT(1.85)
     vg_m = FT(1) - FT(1) / vg_n
     ν = FT(0.495)
     S_s = FT(1e-3)
@@ -123,6 +123,7 @@ FT = Float64
     Y, p, coords = initialize(plant_hydraulics)
 
     Y.vegetation.ϑ_l .= ϑ_l_0
+    @show(Y.vegetation.ϑ_l)
 
     plant_hydraulics_ode! = make_ode_function(plant_hydraulics)
 

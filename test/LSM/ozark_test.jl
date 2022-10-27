@@ -13,6 +13,7 @@ using Dierckx
 using Plots
 using Statistics
 using Dates
+using Plots
 
 using ClimaLSM
 using ClimaLSM.Domains: Column, PlantHydraulicsDomain
@@ -67,9 +68,9 @@ transpiration_function(t::FT) where {FT} =
     f_root_to_shoot = FT(1.0 / 5.0) # guess
     RAI = SAI * f_root_to_shoot # following CLM
     area_index = (root = RAI, stem = SAI, leaf = LAI)
-    plant_K_sat = (root = FT(1.8e-10), stem = FT(1.8e-10), leaf = FT(1.8e-10)) #m^3/m^2/s/Pa, from Natan (10 mol/s/m^2/MPa) 
-    plant_vg_α = FT(0.24) # perhaps changing to linear in future
-    plant_vg_n = FT(2) # vg curve very non-linear -- precision when close to saturation
+    plant_K_sat = (root = FT(1.7658E-12), stem = FT(1.7658E-12), leaf = FT(1.7658E-12)) #m^3/m^2/s/Pa, from Natan (10 mol/s/m^2/MPa) 
+    plant_vg_α = FT(0.06) # perhaps changing to linear in future
+    plant_vg_n = FT(1.85) # vg curve very non-linear -- precision when close to saturation
     plant_vg_m = FT(1) - FT(1) / plant_vg_n
     plant_ν = FT(0.495)
     plant_S_s = FT(1e-3)
@@ -161,6 +162,7 @@ function init_soil!(Ysoil, z, params)
         return FT(ϑ_l)
     end
     Ysoil.soil.ϑ_l .= hydrostatic_profile.(z, Ref(params))
+    @show(Ysoil.soil.ϑ_l)
 end
 init_soil!(Y, cds.subsurface.z, land.soil.parameters)
 
@@ -174,12 +176,13 @@ p_leaf_0 = (-2.0 - (n_stem+n_leaf)*Δz)
 ϑ_l_leaf_0 =
     inverse_water_retention_curve(plant_vg_α, plant_vg_n, plant_vg_m, p_leaf_0, plant_ν, plant_S_s)
 ϑ_l_0 = [ϑ_l_stem_0, ϑ_l_leaf_0]
+@show(ϑ_l_0)
 
-vals = reverse(-Array(1:1:10.0) ./ 10.0 * 2.0 .+ 0.2 / 2.0)
-ic = [0.355686, 0.354263, 0.352855, 0.351462, 0.350083, 0.348718, 0.347368, 0.346031, 0.344708, 0.343398]
+#vals = reverse(-Array(1:1:10.0) ./ 10.0 * 2.0 .+ 0.2 / 2.0)
+#ic = [0.355686, 0.354263, 0.352855, 0.351462, 0.350083, 0.348718, 0.347368, 0.346031, 0.344708, 0.343398]
 
-ic_spline = Spline1D(vals, ic)
-Y.soil.ϑ_l = ic_spline.(cds.subsurface.z)
+#ic_spline = Spline1D(vals, ic)
+#Y.soil.ϑ_l = ic_spline.(cds.subsurface.z)
 #update_aux! = make_update_aux(land) -- dont need, if we remove the returned p at t=0 might be weird
 #update_aux!(p, Y, 0.0)
 
@@ -195,7 +198,10 @@ cb =
     SavingCallback((u, t, integrator) -> copy(integrator.p), sv; saveat = daily)
 prob = ODEProblem(ode!, Y, (t0, tf), p);
 
-sol = solve(prob, RK4(), dt = dt) #, callback = cb); # 8 seconds for 180 days
+#sol = solve(prob, RK4(), dt = dt) #, callback = cb); # 8 seconds for 180 days
+update_interactions! = make_interactions_update_aux(land)
+update_aux! = make_update_aux(land)
+ode_function! = make_ode_function(land)
 
 #=plots
 ϕ_stem = [

@@ -216,7 +216,7 @@ function flux(
     plant_K2_p2 = hydraulic_conductivity(plant_K_sat2, plant_vg_m, S_l2)
 
     flux = -(plant_K1_p1 + plant_K2_p2) / 2 * ((p2 - p1) / (z2 - z1) + 1)
-
+@show(flux)
     return flux # units of [m s-1]
 end
 
@@ -291,6 +291,7 @@ function water_retention_curve(
         ϑ_l = augmented_liquid_fraction(plant_ν, S_l)
         p = (ϑ_l - plant_ν) / plant_S_s
     end
+    @show(p)
     return p # units of (m)
 end
 
@@ -318,6 +319,7 @@ function inverse_water_retention_curve(
         ϑ_l = p * plant_S_s + plant_ν
         S_l = effective_saturation(plant_ν, ϑ_l)
     end
+    @show(S_l)
     return S_l
 end
 
@@ -443,7 +445,7 @@ function flux_out_roots(
     p_stem = water_retention_curve.(plant_vg_α, plant_vg_n, plant_vg_m, S_l_stem, plant_ν, plant_S_s)
     return sum(
         flux.(
-            model.domain.root_depths[1],
+            model.domain.root_depths,
             model.domain.compartment_midpoints[1],
             re.p_soil(t),
             p_stem,
@@ -455,7 +457,7 @@ function flux_out_roots(
             plant_K_sat[:root],
             plant_K_sat[model.domain.compartment_labels[1]],
     ).*
-    model.parameters.root_distribution_function.(model.domain.root_depths[1]).* 
+    model.parameters.root_distribution_function.(model.domain.root_depths).* 
     (
         vcat(model.domain.root_depths, [0.0])[2:end] -
         vcat(model.domain.root_depths, [0.0])[1:(end - 1)]
