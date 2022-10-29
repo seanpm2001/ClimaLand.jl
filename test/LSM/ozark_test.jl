@@ -198,10 +198,10 @@ cb =
     SavingCallback((u, t, integrator) -> copy(integrator.p), sv; saveat = daily)
 prob = ODEProblem(ode!, Y, (t0, tf), p);
 
-#sol = solve(prob, RK4(), dt = dt) #, callback = cb); # 8 seconds for 180 days
-update_interactions! = make_interactions_update_aux(land)
-update_aux! = make_update_aux(land)
-ode_function! = make_ode_function(land)
+sol = solve(prob, RK4(), dt = dt) #, callback = cb); # 8 seconds for 180 days
+#update_interactions! = make_interactions_update_aux(land)
+#update_aux! = make_update_aux(land)
+#ode_function! = make_ode_function(land)
 
 #=plots
 ϕ_stem = [

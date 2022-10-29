@@ -12,7 +12,7 @@ include("SharedUtilities/Domains.jl")
 using .Domains
 include("SharedUtilities/models.jl")
 include("Bucket/Bucket.jl")
-
+export make_interactions_update_aux
 export domain
 
 """
