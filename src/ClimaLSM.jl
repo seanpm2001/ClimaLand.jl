@@ -14,6 +14,7 @@ include("SharedUtilities/models.jl")
 include("SharedUtilities/boundary_conditions.jl")
 include("SharedUtilities/sources.jl")
 include("Bucket/Bucket.jl")
+include("SPAC/SPAC.jl")
 
 export domain
 
