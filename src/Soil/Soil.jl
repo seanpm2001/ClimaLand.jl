@@ -88,8 +88,6 @@ export RichardsModel,
     AbstractSoilSource,
     FluxBC,
     PhaseChange
-#PrecipFreeDrainage,
-#boundary_fluxes,
 
 """
     AbstractSoilBC <: ClimaLSM. AbstractBC
@@ -169,7 +167,17 @@ end
 A simple concrete type of boundary condition, which enforces a
 state boundary condition f(p,t) at either the top or bottom of the domain.
 """
-struct StateBC <: AbstractSoilBC
+struct TemperatureStateBC <: AbstractSoilBC
+    bc::Function
+end
+
+"""
+   StateBC <: AbstractSoilBC
+
+A simple concrete type of boundary condition, which enforces a
+state boundary condition f(p,t) at either the top or bottom of the domain.
+"""
+struct VWCStateBC <: AbstractSoilBC
     bc::Function
 end
 
@@ -190,6 +198,7 @@ the BottomBoundary only, where the flux is set to be
 `F = -K∇h = -K`.
 """
 struct FreeDrainage{FT} <: AbstractSoilBC end
+
 
 """
     ClimaLSM.boundary_flux(bc::FluxBC, _, Δz, _...)::ClimaCore.Fields.Field
@@ -217,7 +226,7 @@ A method of boundary fluxes which converts a state boundary condition on θ_l at
 domain into a flux of liquid water.
 """
 function ClimaLSM.boundary_flux(
-    rre_bc::StateBC,
+    rre_bc::VWCStateBC,
     ::ClimaLSM.TopBoundary,
     Δz,
     p,
@@ -245,7 +254,7 @@ A method of boundary fluxes which converts a state boundary condition on θ_l at
 domain into a flux of liquid water.
 """
 function ClimaLSM.boundary_flux(
-    rre_bc::StateBC,
+    rre_bc::VWCStateBC,
     ::ClimaLSM.BottomBoundary,
     Δz,
     p,
@@ -275,7 +284,7 @@ A method of boundary fluxes which converts a state boundary condition on tempera
 domain into a flux of energy.
 """
 function ClimaLSM.boundary_flux(
-    heat_bc::StateBC,
+    heat_bc::TemperatureStateBC,
     ::ClimaLSM.TopBoundary,
     Δz,
     p,
@@ -297,7 +306,7 @@ A method of boundary fluxes which converts a state boundary condition on tempera
 domain into a flux of energy.
 """
 function ClimaLSM.boundary_flux(
-    heat_bc::StateBC,
+    heat_bc::TemperatureStateBC,
     ::ClimaLSM.BottomBoundary,
     Δz,
     p,
