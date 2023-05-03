@@ -1,4 +1,8 @@
 using Emerald
+using Emerald.EmeraldLand.NameSpace;
+using Emerald.EmeraldLand.CanopyRT;
+
+using StaticArrays
 using DiffEqCallbacks
 using OrdinaryDiffEq: ODEProblem, solve, Euler, RK4
 using ClimaCore
@@ -31,9 +35,26 @@ include(joinpath(climalsm_dir, "experiments/LSM/ozark/ozark_parameters.jl"))
 include(joinpath(climalsm_dir, "experiments/LSM/ozark/ozark_domain.jl"))
 include(joinpath(climalsm_dir, "experiments/LSM/ozark/ozark_simulation.jl"))
 
+
+# Just a test for Yujie's code struct PlantHydraulicsParameters
+NameSpace.use_static_arrays!(true); 
+config=NameSpace.EmeraldConfiguration{FT}(); 
+state=NameSpace.MultipleLayerSPACState{FT}(); 
+@time cache=CanopyRT.canopy_radiation_cache(config,state, 30.0,SVector{9,FT}(ones(9)./9));
+
+struct bla2{FT,M,D} <: AbstractModel{FT}
+    rad::M
+    domain::D
+end
+
+#cache2 = bla2{FT, typeof(cache), typeof(soil_domain)}(cache,soil_domain)
+
 # Now we set up the model. For the soil model, we pick
 # a model type and model args:
 soil_domain = Column(; zlim = (zmin, zmax), nelements = nelements)
+cache2 = bla2{FT, typeof(cache), typeof(soil_domain)}(cache,soil_domain)
+ClimaLSM.domain(model::bla2) = :domain;
+
 soil_ps = Soil.RichardsParameters{FT}(
     soil_ν,
     soil_vg_α,
@@ -157,6 +178,7 @@ land = SoilPlantHydrologyModel{FT}(;
     canopy_component_types = canopy_component_types,
     canopy_component_args = canopy_component_args,
     canopy_model_args = canopy_model_args,
+    radiation_cache = cache2,
 )
 Y, p, cds = initialize(land)
 ode! = make_ode_function(land)

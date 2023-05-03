@@ -17,11 +17,14 @@ struct SoilPlantHydrologyModel{
     FT,
     SM <: Soil.AbstractSoilModel{FT},
     VM <: Canopy.CanopyModel{FT},
+    RM,
 } <: AbstractLandModel{FT}
     "The soil model to be used"
     soil::SM
     "The canopy model to be used"
     canopy::VM
+    "Radiation cache"
+    rad::RM
 end
 
 
@@ -49,6 +52,7 @@ function SoilPlantHydrologyModel{FT}(;
     canopy_component_types::NamedTuple = (;),
     canopy_component_args::NamedTuple = (;),
     canopy_model_args::NamedTuple = (;),
+    radiation_cache =(;),
 ) where {FT, SM <: Soil.AbstractSoilModel{FT}}
 
     # These may be passed in, or set, depending on use scenario.
@@ -99,9 +103,10 @@ function SoilPlantHydrologyModel{FT}(;
         canopy_model_args...,
     )
 
-    return SoilPlantHydrologyModel{FT, typeof(soil), typeof(canopy)}(
+    return SoilPlantHydrologyModel{FT, typeof(soil), typeof(canopy),typeof(radiation_cache) }(
         soil,
         canopy,
+        radiation_cache,
     )
 end
 
@@ -124,8 +129,8 @@ term (runoff) for the surface water model.
 This function is called each ode function evaluation.
 """
 function make_interactions_update_aux(
-    land::SoilPlantHydrologyModel{FT, SM, RM},
-) where {FT, SM <: Soil.RichardsModel{FT}, RM <: Canopy.CanopyModel{FT}}
+    land::SoilPlantHydrologyModel{FT, SM, RM,RC},
+) where {FT, SM <: Soil.RichardsModel{FT}, RM <: Canopy.CanopyModel{FT},RC}
     function update_aux!(p, Y, t)
         z = ClimaCore.Fields.coordinate_field(land.soil.domain.space).z
         @unpack vg_α, vg_n, vg_m, ν, S_s, K_sat, area_index =
