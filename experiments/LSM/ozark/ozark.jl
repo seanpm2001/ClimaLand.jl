@@ -52,8 +52,14 @@ end
 # Now we set up the model. For the soil model, we pick
 # a model type and model args:
 soil_domain = Column(; zlim = (zmin, zmax), nelements = nelements)
-cache2 = bla2{FT, typeof(cache), typeof(soil_domain)}(cache,soil_domain)
+dom = ClimaLSM.Domains.Point(z_sfc=1.0)
+cache2 = bla2{FT, typeof(cache), typeof(dom)}(cache,dom)
 ClimaLSM.domain(model::bla2) = :domain;
+ClimaLSM.name(model::bla2) = :radiation;
+ClimaLSM.auxiliary_vars(model::bla2) = (:rad,)
+ClimaLSM.auxiliary_types(model::bla2{FT,M}) where {FT,M} = (M,)
+
+Base.zero(x::Type{<:Emerald.EmeraldLand.NameSpace.CanopyRadiationCache}) = cache
 
 soil_ps = Soil.RichardsParameters{FT}(
     soil_ν,
