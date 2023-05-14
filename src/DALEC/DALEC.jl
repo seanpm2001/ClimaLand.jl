@@ -5,8 +5,10 @@ using ClimaCore
 using ClimaLSM
 
 export DALEC811Parameters, DALECModel, ACM
-export dalec_811_parmin, dalec_811_parmax, dalec_811_parnames,  check_dalec_811_parameter_bounds
-export DALEC811AtmosphericDrivers, DALEC811FireDrivers, DALEC811RadiativeDrivers, DALEC811TemporalDrivers
+export dalec_811_parmin, dalec_811_parmax
+export dalec_811_parnames,  check_dalec_811_parameter_bounds
+export DALEC811AtmosphericDrivers, DALEC811FireDrivers
+export DALEC811RadiativeDrivers, DALEC811TemporalDrivers
 export load_initial_condition!
 
 include("./auxi/ACM.jl")
@@ -27,7 +29,8 @@ abstract type AbstractDALECParameters{FT <:AbstractFloat} end
 Atmospheric drivers for DALEC811 model.
 $(DocStringExtensions.FIELDS)
 """
-struct DALEC811AtmosphericDrivers{T <: AbstractFloat, TMIN, TMAX, C, V, P} <:AbstractAtmosphericDrivers{T}  
+struct DALEC811AtmosphericDrivers{T <: AbstractFloat, TMIN, TMAX, C, V, P} <: 
+    AbstractAtmosphericDrivers{T}  
     T_MIN::TMIN
     T_MAX::TMAX
     ATMOSPHERIC_CO2::C
@@ -46,7 +49,8 @@ end
 Radiative drivers for the DALEC811 model.
 $(DocStringExtensions.FIELDS)
 """
-struct DALEC811RadiativeDrivers{T <: AbstractFloat, SRD} <:AbstractRadiativeDrivers{T}  
+struct DALEC811RadiativeDrivers{T <: AbstractFloat, SRD} <: 
+    AbstractRadiativeDrivers{T}  
     SSRD::SRD
     FT::Type{T}
 end
@@ -83,40 +87,40 @@ Parameters for the DALEC811 model.
 $(DocStringExtensions.FIELDS)
 """
 struct DALEC811Parameters{FT <: AbstractFloat} <: AbstractDALECParameters{FT} 
-     # Trainable DALEC Parameters
-     decomposition_rate::FT
-     f_gpp::FT
-     f_fol::FT
-     f_root::FT
-     leaf_lifespan::FT
-     tor_wood::FT
-     tor_root::FT
-     tor_litter::FT
-     tor_som::FT
-     Q10::FT
-     canopy_efficiency::FT
-     Bday::FT
-     f_lab::FT
-     clab_release_period::FT
-     Fday::FT
-     leaf_fall_period::FT
-     LMCA::FT
-     Clab::FT
-     Cfol::FT
-     Croot::FT
-     Cwood::FT
-     Clitter::FT
-     Csom::FT
-     IWUE::FT
-     runoff_focal_point::FT
-     wilting_point::FT
-     initial_water::FT
-     foliar_cf::FT
-     ligneous_cf::FT
-     dom_cf::FT
-     resilience::FT
-     lab_lifespan::FT
-     moisture_factor::FT 
+    # Trainable DALEC Parameters
+    decomposition_rate::FT
+    f_gpp::FT
+    f_fol::FT
+    f_root::FT
+    leaf_lifespan::FT
+    tor_wood::FT
+    tor_root::FT
+    tor_litter::FT
+    tor_som::FT
+    Q10::FT
+    canopy_efficiency::FT
+    Bday::FT
+    f_lab::FT
+    clab_release_period::FT
+    Fday::FT
+    leaf_fall_period::FT
+    LMCA::FT
+    Clab::FT
+    Cfol::FT
+    Croot::FT
+    Cwood::FT
+    Clitter::FT
+    Csom::FT
+    IWUE::FT
+    runoff_focal_point::FT
+    wilting_point::FT
+    initial_water::FT
+    foliar_cf::FT
+    ligneous_cf::FT
+    dom_cf::FT
+    resilience::FT
+    lab_lifespan::FT
+    moisture_factor::FT 
 end
 
 """
