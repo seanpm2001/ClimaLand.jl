@@ -159,12 +159,24 @@ Y, p, cds = initialize(land)
 ode! = make_ode_function(land)
 
 #Initial conditions
-Y.soil.ϑ_l = FT(0.43)
-θ_plant = (0.2, 0.05)
-for i in 1:2
-    Y.canopy.hydraulics.ϑ_l[i] .= θ_plant[i]
-end
+Y.soil.ϑ_l = FT(0.35)
+p_stem_0 = -6.5747141757962995
+p_leaf_0 = -23.01511589000899
 
+S_l_ini =
+    inverse_water_retention_curve.(
+        plant_vg_α,
+        plant_vg_n,
+        plant_vg_m,
+        [p_stem_0, p_leaf_0],
+        plant_ν,
+        plant_S_s,
+    )
+
+for i in 1:2
+    Y.canopy.hydraulics.ϑ_l[i] .=
+        augmented_liquid_fraction.(plant_ν, S_l_ini[i])
+end
 update_aux! = make_update_aux(land)
 update_aux!(p, Y, 0.0)
 
@@ -297,3 +309,16 @@ plt2 = Plots.plot(
 )
 Plots.plot(plt2, plt1, layout = (2, 1))
 Plots.savefig(joinpath(savedir, "soil_water_content.png"))
+#=
+root_extraction = [-sum(sv.saveval[k].root_extraction) for k in 1:length(sol.t)]
+
+Plots.plot(
+    daily,
+    root_extraction .* (1e3 * 24 * 3600),
+    label = "Model",
+    ylabel = "Root Extraction [mm/day]",
+    xlim = [minimum(daily), maximum(daily)],
+    ylim = [-2000, 0],
+)
+Plots.savefig(joinpath(savedir, "root_extraction.png"))
+=#
