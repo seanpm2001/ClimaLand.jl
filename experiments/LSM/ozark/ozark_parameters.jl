@@ -38,15 +38,15 @@ To = FT(298.15)
 ΔHRd = FT(46390)
 
 # Plant Hydraulics and general plant parameters
-SAI = FT(0.00242) # m2/m2
-LAI = FT(4.2) # m2/m2, from Wang et al.
-f_root_to_shoot = FT(3.5)
+SAI = FT(1.0) # m2/m2
+LAI = FT(1.0) # m2/m2, from Wang et al.
+f_root_to_shoot = FT(0.5)
 RAI = (SAI + LAI) * f_root_to_shoot
-K_sat_plant = 1.8e-8 # m/s, guess, close to Natan
-plant_vg_α = FT(0.002) # 1/m, matches Natan (fitted vG to Weibull)
-plant_vg_n = FT(4.2) # unitless, matches Natan (fitted vG to Weibull)
+K_sat_plant = 4e-7 # m/s, guess, close to Natan
+plant_vg_α = FT(1.368) # 1/m, matches Natan (fitted vG to Weibull)
+plant_vg_n = FT(2.6257) # unitless, matches Natan (fitted vG to Weibull)
 plant_vg_m = FT(1) - FT(1) / plant_vg_n
-plant_ν = FT(0.7) # guess, m3/m3
+plant_ν = FT(0.45) # guess, m3/m3
 plant_S_s = FT(1e-2 * 0.0098) # m3/m3/MPa to m3/m3/m
 rooting_depth = FT(1.0) # from Wang et al.
 z0_m = FT(2)

@@ -145,8 +145,6 @@ canopy_model_args =
     (; parameters = shared_params, domain = ClimaLSM.Point(; z_sfc = zmax))
 
 # Integrated plant hydraulics and soil model
-# The default is diagnostics transpiration. In this case, we are testing with prescribed
-# but will change that soon.
 land_input =
     (transpiration = transpiration, atmos = atmos, radiation = radiation)
 land = SoilPlantHydrologyModel{FT}(;
@@ -161,23 +159,10 @@ Y, p, cds = initialize(land)
 ode! = make_ode_function(land)
 
 #Initial conditions
-Y.soil.ϑ_l = FT(0.35)
-p_stem_0 = FT(-1e6 / 9800)
-p_leaf_0 = FT(-2e6 / 9800)
-
-S_l_ini =
-    inverse_water_retention_curve.(
-        plant_vg_α,
-        plant_vg_n,
-        plant_vg_m,
-        [p_stem_0, p_leaf_0],
-        plant_ν,
-        plant_S_s,
-    )
-
+Y.soil.ϑ_l = FT(0.43)
+θ_plant = (0.2, 0.05)
 for i in 1:2
-    Y.canopy.hydraulics.ϑ_l[i] .=
-        augmented_liquid_fraction.(plant_ν, S_l_ini[i])
+    Y.canopy.hydraulics.ϑ_l[i] .= θ_plant[i]
 end
 
 update_aux! = make_update_aux(land)
@@ -198,84 +183,117 @@ sol = solve(
     callback = cb,
     adaptive = false,
     saveat = halfhourly,
-)
+);
 
 # Plotting
-hours = sol.t ./ 3600
+daily = sol.t ./ 3600 ./ 24
 savedir = joinpath(climalsm_dir, "experiments/LSM/ozark")
 model_GPP = [
     parent(sv.saveval[k].canopy.photosynthesis.GPP)[1] for k in 1:length(sol.t)
-]
-Plots.plot(
-    hours,
+        ]
+plt1 = Plots.plot(size = (500,700))
+Plots.plot!(plt1,
+    daily,
     model_GPP .* 1e6,
     label = "Model",
-    xlim = [minimum(hours), maximum(hours)],
-    xlabel = "hours",
+    xlim = [minimum(daily), maximum(daily)],
+    xlabel = "days",
     ylabel = "GPP [μmol/mol]",
+    ylim = [0,10]
 )
-Plots.plot!(seconds ./ 3600, GPP .* 1e6, label = "Data")
+Plots.plot!(plt1,seconds ./ 3600 ./24, GPP .* 1e6, label = "Data", margins = 10Plots.mm)
+plt2 = Plots.plot(seconds ./ 3600 ./24, FT.(SW_IN), label = "Data" , xlim = [minimum(daily), maximum(daily)],ylabel = " SW radiation (W/m^2)", size = (500,700))
+Plots.plot(plt1, plt2, layout = (2,1))
 Plots.savefig(joinpath(savedir, "GPP.png"))
+
 T =
     [
         parent(sv.saveval[k].canopy.conductance.transpiration)[1] for
         k in 1:length(sol.t)
     ] .* (1e3 * 24 * 3600)
 measured_T = LE ./ (LSMP.LH_v0(earth_param_set) * 1000) .* (1e3 * 24 * 3600)
-Plots.plot(
-    hours,
+plt1 = Plots.plot(size = (500,700))
+Plots.plot!(plt1,seconds ./ 3600 ./24, measured_T, label = "Data", margins = 10Plots.mm,)
+Plots.plot!(plt1,
+    daily,
     T,
     label = "Model",
-    xlim = [minimum(hours), maximum(hours)],
-    xlabel = "hours",
+    xlim = [minimum(daily), maximum(daily)],
+    xlabel = "days",
     ylabel = "T [mm/day]",
+    ylim = [0,10]
 )
-Plots.plot!(seconds ./ 3600, measured_T, label = "Data")
-Plots.savefig(joinpath(savedir, "T.png"))
 
-plt1 = Plots.plot()
+plt2 = Plots.plot(seconds ./ 3600 ./24,
+                  VPD,
+                  label = "Measured",
+                  ylabel = "VPD (Pa)",
+                  xlim = [minimum(daily), maximum(daily)],
+                  ylim = [0,2000],
+                  size = (500,700)
+                  )
+Plots.plot(plt2, plt1, layout = (2, 1))
+Plots.savefig(joinpath(savedir, "transpiration.png"))
+
+g_stomata = [
+        parent(sv.saveval[k].canopy.conductance.gs)[1] for
+        k in 1:length(sol.t)
+    ]
+Plots.plot(
+    daily,
+    g_stomata,
+    label = "Model",
+    xlim = [minimum(daily), maximum(daily)],
+    xlabel = "days",
+    ylabel = "Stomatal conductance",
+    ylim = [0,0.3]
+)
+Plots.savefig(joinpath(savedir, "stomatal_conductance.png"))
+           
+plt1 = Plots.plot(size = (500,700))
 Plots.plot!(
     plt1,
-    hours,
+    daily,
     [parent(sol.u[k].soil.ϑ_l)[end] for k in 1:1:length(sol.t)],
     label = "10cm",
     xtickfontsize = 5,
     ytickfontsize = 5,
-    xlim = [minimum(hours), maximum(hours)],
-    ylim = [0.2, 0.5],
-    xlabel = "Hours",
+    xlim = [minimum(daily), maximum(daily)],
+    ylim = [0.05, 0.5],
+    xlabel = "Days",
     ylabel = "SWC [m/m]",
+    margins = 10Plots.mm
 )
 
 plot!(
     plt1,
-    hours,
+    daily,
     [parent(sol.u[k].soil.ϑ_l)[end - 1] for k in 1:1:length(sol.t)],
     label = "20cm",
 )
 
 plot!(
     plt1,
-    hours,
+    daily,
     [parent(sol.u[k].soil.ϑ_l)[end - 2] for k in 1:1:length(sol.t)],
     label = "30cm",
 )
 
 plot!(
     plt1,
-    hours,
+    daily,
     [parent(sol.u[k].soil.ϑ_l)[end - 3] for k in 1:1:length(sol.t)],
     label = "40cm",
 )
-Plots.plot!(plt1, seconds ./ 3600, SWC, label = "Data")
+Plots.plot!(plt1, seconds ./ 3600 ./24, SWC, label = "Data")
 plt2 = Plots.plot(
-    seconds ./ 3600,
-    P .* (1e3 * 24 * 3600),
+    seconds ./ 3600 ./24,
+    P .* (-1e3 * 24 * 3600),
     label = "Data",
     ylabel = "Precipitation [mm/day]",
-    xlabel = "Hours",
-    xlim = [minimum(hours), maximum(hours)],
-    ylim = [0, 200],
+    xlim = [minimum(daily), maximum(daily)],
+    ylim = [-200, 0],
+    size = (500,700)
 )
 Plots.plot(plt2, plt1, layout = (2, 1))
-Plots.savefig(joinpath(savedir, "SWC.png"))
+Plots.savefig(joinpath(savedir, "soil_water_content.png"))

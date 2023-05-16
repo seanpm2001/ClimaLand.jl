@@ -78,6 +78,7 @@ q = @. 0.622 * e ./ (PA - 0.378 * e)
 
 #Make a bunch of splines
 seconds = FT.(0:1800:((length(UTC_DATETIME) - 1) * 1800));
+
 p_spline = Spline1D(seconds, -P[:]) # m/s
 atmos_q = Spline1D(seconds, q[:])
 atmos_T = Spline1D(seconds, TA[:])
@@ -88,7 +89,7 @@ LW_IN_spline = Spline1D(seconds, LW_IN[:])
 SW_IN_spline = Spline1D(seconds, SW_IN[:])
 atmos_h = FT(32)
 precipitation_function(t::FT) where {FT} = p_spline(t) < 0.0 ? p_spline(t) : 0.0 # m/s
-snow_precip(t) = eltype(t)(0) # this is likely not correct
+snow_precip(t) = eltype(t)(0) # this is likely not correct for this site
 
 
 # Construct the drivers
@@ -113,7 +114,7 @@ function zenith_angle(
     insol_params = earth_param_set.insol_params,
 ) where {FT}
     # This should be time in UTC
-    dt = DateTime("2004-01-01-06", "yyyy-mm-dd-HH") + Dates.Second(t)
+    dt = DateTime("2004-01-01-06", "yyyy-mm-dd-HH") + Dates.Second(Int64.(round(t)))
     FT(instantaneous_zenith_angle(dt, longitude, latitude, insol_params)[1])
 end
 
