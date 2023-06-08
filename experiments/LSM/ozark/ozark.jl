@@ -154,7 +154,7 @@ Y, p, cds = initialize(land)
 exp_tendency! = make_exp_tendency(land)
 
 #Initial conditions
-Y.soil.ϑ_l = FT(0.4)
+Y.soil.ϑ_l = FT(0.27)
 ψ_stem_0 = FT(-1e5 / 9800)
 ψ_leaf_0 = FT(-2e5 / 9800)
 
@@ -409,7 +409,7 @@ lwp = [
 swp = [
     parent(sv.saveval[k].canopy.hydraulics.ψ)[1] * 9800 for k in 1:length(sol.t)
 ]
-
+soil_p = [sum(root_distribution.(cds.subsurface.z; rooting_depth = rooting_depth).*sv.saveval[k].soil.ψ)*9800 for k in 1:length(sol.t)]
 plt2 = Plots.plot(
     daily,
     lwp,
@@ -421,6 +421,7 @@ plt2 = Plots.plot(
     left_margin = 10Plots.mm,
 )
 Plots.plot!(plt2, daily, swp, label = "Model, Stem")
+Plots.plot!(plt2, daily, soil_p, label = "Model, Soil")
 
 Plots.plot!(
     plt2,
