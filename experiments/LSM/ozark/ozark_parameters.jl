@@ -2,9 +2,8 @@
 soil_ν = FT(0.45) # m3/m3
 soil_K_sat = FT(0.45/3600/100) # m/s, matches Natan
 soil_S_s = FT(1e-3) # 1/m, guess
-soil_vg_n = FT(1.41) # unitless, from Bonan Table 8.3
+soil_vg_n = FT(1.4) # unitless, from Bonan Table 8.3
 soil_vg_α = FT(2.0) # inverse meters. from Bonan Table 8.3
-soil_vg_m = FT(1) - FT(1) / soil_vg_n # unitless
 θ_r = FT(0.067) # m3/m3, from Bonan's Table 8.3
 
 # Beer Lambert model parameters
@@ -14,7 +13,7 @@ ld = FT(0.5)
 λ_γ = FT(5e-7)
 
 # Conductance Model
-g1 = FT(50)
+g1 = FT(140)
 Drel = FT(1.6)
 g0 = FT(1e-4)
 
@@ -24,8 +23,8 @@ oi = FT(0.209)
 θj = FT(0.9)
 f = FT(0.015)
 sc = FT(5e-6)
-pc = FT(-2e5)
-Vcmax25 = FT(8e-5)
+pc = FT(-0.2e6)
+Vcmax25 = FT(7e-5)
 Γstar25 = FT(4.275e-5)
 Kc25 = FT(4.049e-4)
 Ko25 = FT(0.2874)
@@ -39,17 +38,17 @@ To = FT(298.15)
 
 # Plant Hydraulics and general plant parameters
 SAI = FT(0.00242) # m2/m2
-LAI = FT(5.5) # m2/m2, Peak during summer
+LAI = FT(4.2) # m2/m2, Peak during summer
 f_root_to_shoot = FT(3.5)
 RAI = (SAI + LAI) * f_root_to_shoot
-K_sat_plant = 1.8e-8 # m/s
-ψ63 = FT(-4 / 0.0098) # / MPa to m, Holtzman's original parameter value
+K_sat_plant = 1e-8 # m/s
+ψ63 = FT(-4 / 0.0098) # / MPa to m, Holtzman's original parameter value/2
 Weibull_param = FT(4) # unitless, Holtzman's original c param value
 a = FT(0.05 * 0.0098) # Holtzman's original parameter for the bulk modulus of elasticity
 conductivity_model =
     PlantHydraulics.Weibull{FT}(K_sat_plant, ψ63, Weibull_param)
 retention_model = PlantHydraulics.LinearRetentionCurve{FT}(a)
-plant_ν = FT(0.7) # guess, m3/m3
+plant_ν = FT(0.7) # unconstrained
 plant_S_s = FT(1e-2 * 0.0098) # m3/m3/MPa to m3/m3/m
 rooting_depth = FT(1.0) # from Wang et al.
 z0_m = FT(2)

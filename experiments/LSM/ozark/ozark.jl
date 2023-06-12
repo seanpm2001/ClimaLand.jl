@@ -435,3 +435,5 @@ Plots.plot(plt2, plt1, layout = (2, 1))
 Plots.savefig(joinpath(savedir, "plant_hydraulics.png"))
 
 rm(joinpath(savedir, "Artifacts.toml"))
+@show median(model_GPP)*1e6/median(T)
+@show median(GPP)*1e6/median(measured_T)
