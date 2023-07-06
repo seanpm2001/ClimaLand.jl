@@ -162,7 +162,7 @@ exp_tendency! = make_exp_tendency(land)
 imp_tendency! = make_imp_tendency(land)
 
 #Initial conditions
-Y.soil.ϑ_l = SWC[Int(round(t0 / 1800))] # Get soil water content at t0
+Y.soil.ϑ_l = SWC[Int(round(t0 / 1800)) + 1] # Get soil water content at t0
 ψ_stem_0 = FT(-1e5 / 9800)
 ψ_leaf_0 = FT(-2e5 / 9800)
 
