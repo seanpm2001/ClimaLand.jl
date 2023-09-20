@@ -102,10 +102,13 @@ end
             npolynomial = 1,
         ),
     ]
+
+    AR_params = AutotrophicRespirationParameters{FT}()
     RTparams = BeerLambertParameters{FT}()
     photosynthesis_params = FarquharParameters{FT}(C3();)
     stomatal_g_params = MedlynConductanceParameters{FT}()
-
+    
+    AR_model = AutotrophicRespirationModel{FT}(AR_params)
     stomatal_model = MedlynConductanceModel{FT}(stomatal_g_params)
     photosynthesis_model = FarquharModel{FT}(photosynthesis_params)
     rt_model = BeerLambertModel{FT}(RTparams)
@@ -241,10 +244,13 @@ end
         compartment_surfaces = compartment_surfaces,
         compartment_midpoints = compartment_midpoints,
     )
+    autotrophic_parameters = ClimaLSM.Canopy.AutotrophicRespirationParameters{FT}()
+    autotrophic_respiration_model = ClimaLSM.Canopy.AutotrophicRespirationModel(autotrophic_parameters)
     for domain in domains
         model = ClimaLSM.Canopy.CanopyModel{FT}(;
             parameters = shared_params,
             domain = domain,
+            autotrophic_respiration = autotrophic_respiration_model,
             radiative_transfer = rt_model,
             photosynthesis = photosynthesis_model,
             conductance = stomatal_model,
