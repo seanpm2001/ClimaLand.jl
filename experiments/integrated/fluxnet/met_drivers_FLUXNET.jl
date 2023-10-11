@@ -46,27 +46,27 @@ SW_IN = driver_data[2:end, column_names .== "SW_IN_F"]
 CO2_F = driver_data[2:end, column_names .== "CO2_F_MDS_QC"]
 CO2 = driver_data[2:end, column_names .== "CO2_F_MDS"] .* 1e-6; # convert \mumol to mol
 replace_missing_with_mean!(CO2, CO2_F)
-SWC_F = driver_data[2:end, column_names .== "SWC_F_MDS_1_QC"] # Most likely 5cm depth
-SWC = driver_data[2:end, column_names .== "SWC_F_MDS_1"] ./ 100; # to convert from % to m^3/m^3
-replace_missing_with_mean!(SWC, SWC_F)
-TS_F = driver_data[2:end, column_names .== "TS_F_MDS_1_QC"] # Most likely 5cm depth
+# SWC_F = driver_data[2:end, column_names .== "SWC_F_MDS_1_QC"] # Most likely 5cm depth
+# SWC = driver_data[2:end, column_names .== "SWC_F_MDS_1"] ./ 100; # to convert from % to m^3/m^3
+# replace_missing_with_mean!(SWC, SWC_F)
+TS_F = driver_data[2:end, column_names .== "TS_F_MDS_2_QC"] # Most likely 5cm depth
 TS = driver_data[2:end, column_names .== "TS_F_MDS_1"] .+ 273.15;# convert C to K
 replace_missing_with_mean!(TS, TS_F)
 GPP = driver_data[2:end, column_names .== "GPP_DT_VUT_REF"] .* 1e-6 # to convert from micromol to mol.
 LE = driver_data[2:end, column_names .== "LE_CORR"]
 H_CORR = driver_data[2:end, column_names .== "H_CORR"]
 H = driver_data[2:end, column_names .== "H_F_MDS"]
-H_F = driver_data[2:end, column_names .== "H_F_MDS_QC"]
-replace_missing_with_mean!(H, H_F)
-G = driver_data[2:end, column_names .== "G_F_MDS"]
-G_F = driver_data[2:end, column_names .== "G_F_MDS_QC"]
-replace_missing_with_mean!(G, G_F)
+# H_F = driver_data[2:end, column_names .== "H_F_MDS_QC"]
+# replace_missing_with_mean!(H, H_F)
+# # G = driver_data[2:end, column_names .== "G_F_MDS"]
+# # G_F = driver_data[2:end, column_names .== "G_F_MDS_QC"]
+# replace_missing_with_mean!(G, G_F)
 LAI_data = driver_data[2:end, column_names .== "value_mean"]
 
-LW_OUT = driver_data[2:end, column_names .== "LW_OUT"]# This has missing data
-SW_OUT = driver_data[2:end, column_names .== "SW_OUT"]# This has missing data
-replace_missing_with_mean_by_value!(SW_OUT)
-replace_missing_with_mean_by_value!(LW_OUT)
+# LW_OUT = driver_data[2:end, column_names .== "LW_OUT"]# This has missing data
+# SW_OUT = driver_data[2:end, column_names .== "SW_OUT"]# This has missing data
+# replace_missing_with_mean_by_value!(SW_OUT)
+# replace_missing_with_mean_by_value!(LW_OUT)
 
 LOCAL_DATETIME = DateTime.(string.(driver_data[2:end, 1]), "yyyymmddHHMM")
 UTC_DATETIME = LOCAL_DATETIME .+ Dates.Hour(time_v_UTC

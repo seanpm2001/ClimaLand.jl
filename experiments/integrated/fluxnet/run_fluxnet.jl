@@ -22,7 +22,7 @@ earth_param_set = create_lsm_parameters(FT)
 climalsm_dir = pkgdir(ClimaLSM)
 
 # Retrieve the data file locations
-file_map = Dict("ozark"=>("ozark.json"))
+file_map = Dict("ozark"=>("ozark.json"), "harvard"=>("harvard.json"))
 json_file = file_map[ARGS[1]]
 
 # Load site parameters from JSON file
@@ -226,7 +226,8 @@ Y, p, cds = initialize(land)
 exp_tendency! = make_exp_tendency(land)
 
 #Initial conditions
-Y.soil.ϑ_l = SWC[1 + Int(round(t0 / DATA_DT))] # Get soil water content at t0
+# Y.soil.ϑ_l = SWC[1 + Int(round(t0 / DATA_DT))] # Get soil water content at t0
+Y.soil.ϑ_l = FT(0.3)
 # Both data and simulation are reference to 2005-01-01-00 (LOCAL)
 # or 2005-01-01-06 (UTC)
 Y.soil.θ_i = FT(0.0)
@@ -377,55 +378,55 @@ Plots.plot!(
 
 Plots.savefig(joinpath(savedir, "GPP.png"))
 
-# SW_OUT
-SW_out_model = [parent(sv.saveval[k].SW_out)[1] for k in 1:length(sv.saveval)]
-SW_out_model_avg = diurnal_avg(SW_out_model)
-SW_out_data_avg =
-    diurnal_avg(FT.(SW_OUT)[Int64(t_spinup ÷ DATA_DT):Int64(tf ÷ DATA_DT)])
+# # SW_OUT
+# SW_out_model = [parent(sv.saveval[k].SW_out)[1] for k in 1:length(sv.saveval)]
+# SW_out_model_avg = diurnal_avg(SW_out_model)
+# SW_out_data_avg =
+#     diurnal_avg(FT.(SW_OUT)[Int64(t_spinup ÷ DATA_DT):Int64(tf ÷ DATA_DT)])
 
-RMSD = StatsBase.rmsd(SW_out_model_avg, SW_out_data_avg[1:data_per_model:end])
-R² = Statistics.cor(SW_out_model_avg, SW_out_data_avg[1:data_per_model:end])^2
+# RMSD = StatsBase.rmsd(SW_out_model_avg, SW_out_data_avg[1:data_per_model:end])
+# R² = Statistics.cor(SW_out_model_avg, SW_out_data_avg[1:data_per_model:end])^2
 
-plt1 = Plots.plot(size = (1500, 400))
-Plots.plot!(
-    plt1,
-    data_daily_indices,
-    SW_out_data_avg,
-    label = "Data",
-    title = "Outgoing SW (W/m^2): RMSD = $(round(RMSD, digits = 2)), R² = $(round(R², digits = 2))",
-    xlabel = "Hour of day",
-    margin = 10Plots.mm,
-)
+# plt1 = Plots.plot(size = (1500, 400))
+# Plots.plot!(
+#     plt1,
+#     data_daily_indices,
+#     SW_out_data_avg,
+#     label = "Data",
+#     title = "Outgoing SW (W/m^2): RMSD = $(round(RMSD, digits = 2)), R² = $(round(R², digits = 2))",
+#     xlabel = "Hour of day",
+#     margin = 10Plots.mm,
+# )
 
-Plots.plot!(plt1, model_daily_indices, SW_out_model_avg, label = "Model")
+# Plots.plot!(plt1, model_daily_indices, SW_out_model_avg, label = "Model")
 
-Plots.savefig(joinpath(savedir, "SW_OUT.png"))
-
-
-# LW_OUT
-LW_out_model = [parent(sv.saveval[k].LW_out)[1] for k in 1:length(sv.saveval)]
-LW_out_model_avg = diurnal_avg(LW_out_model)
-LW_out_data_avg =
-    diurnal_avg(FT.(LW_OUT)[Int64(t_spinup ÷ DATA_DT):Int64(tf ÷ DATA_DT)])
+# Plots.savefig(joinpath(savedir, "SW_OUT.png"))
 
 
-RMSD = StatsBase.rmsd(LW_out_model_avg, LW_out_data_avg[1:data_per_model:end])
-R² = Statistics.cor(LW_out_model_avg, LW_out_data_avg[1:data_per_model:end])^2
+# # LW_OUT
+# LW_out_model = [parent(sv.saveval[k].LW_out)[1] for k in 1:length(sv.saveval)]
+# LW_out_model_avg = diurnal_avg(LW_out_model)
+# LW_out_data_avg =
+#     diurnal_avg(FT.(LW_OUT)[Int64(t_spinup ÷ DATA_DT):Int64(tf ÷ DATA_DT)])
 
-plt1 = Plots.plot(size = (1500, 400))
-Plots.plot!(
-    plt1,
-    data_daily_indices,
-    LW_out_data_avg,
-    label = "Data",
-    title = "Outgoing LW (W/m^2): RMSD = $(round(RMSD, digits = 2)), R² = $(round(R², digits = 2))",
-    xlabel = "Hour of day",
-    margin = 10Plots.mm,
-)
 
-Plots.plot!(plt1, model_daily_indices, LW_out_model_avg, label = "Model")
+# RMSD = StatsBase.rmsd(LW_out_model_avg, LW_out_data_avg[1:data_per_model:end])
+# R² = Statistics.cor(LW_out_model_avg, LW_out_data_avg[1:data_per_model:end])^2
 
-Plots.savefig(joinpath(savedir, "LW_out.png"))
+# plt1 = Plots.plot(size = (1500, 400))
+# Plots.plot!(
+#     plt1,
+#     data_daily_indices,
+#     LW_out_data_avg,
+#     label = "Data",
+#     title = "Outgoing LW (W/m^2): RMSD = $(round(RMSD, digits = 2)), R² = $(round(R², digits = 2))",
+#     xlabel = "Hour of day",
+#     margin = 10Plots.mm,
+# )
+
+# Plots.plot!(plt1, model_daily_indices, LW_out_model_avg, label = "Model")
+
+# Plots.savefig(joinpath(savedir, "LW_out.png"))
 
 
 T =
@@ -519,7 +520,7 @@ plot!(
     label = "Ice, 5cm",
 )
 
-Plots.plot!(plt1, seconds ./ 3600 ./ 24, SWC, label = "Data")
+# Plots.plot!(plt1, seconds ./ 3600 ./ 24, SWC, label = "Data")
 plt2 = Plots.plot(
     seconds ./ 3600 ./ 24,
     P .* (-1e3 * 24 * 3600),
