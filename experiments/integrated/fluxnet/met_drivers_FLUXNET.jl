@@ -17,9 +17,11 @@ function replace_missing_with_mean_by_value!(field)
     return field
 end
 
+datafile = json_data["datafile"]
+
 # Extract meteorological data from data file
 af = ArtifactFile(
-    url = file_locations[2],
+    url = datafile,
     filename = "fluxnet_data.csv",
 )
 dataset = ArtifactWrapper(@__DIR__, "ameriflux_data", ArtifactFile[af]);
@@ -27,7 +29,7 @@ dataset_path = get_data_folder(dataset);
 data = joinpath(dataset_path, "fluxnet_data.csv");
 driver_data = readdlm(data, ',')
 
-location_params = params[1]["location"][1]
+location_params = params["location"]
 
 lat = parse(FT, location_params["latitude"])
 long = parse(FT, location_params["longitude"])

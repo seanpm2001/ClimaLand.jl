@@ -1,106 +1,91 @@
 {
-    "params": [
-        {
-            "location": [
-                {
-                    "latitude": "45.95",
-                    "longitude": "-90.25",
-                    "timezone": "6"
-                }
-            ],
-            "autotrophic_respiration": [
-                {
-                    "ne": "8e-4",
-                    "ηsl": "0.01",
-                    "σl": "0.05",
-                    "μr": "1.0",
-                    "μs": "0.1",
-                    "f1":"0.012",
-                    "f2":"0.25"
-                }
-            ],
-            "soil": [
-                {
-                    "soil_ν": "0.5",
-                    "soil_K_sat": "4e-7",
-                    "soil_S_s": "1e-4",
-                    "soil_vg_n": "2.05",
-                    "soil_vg_α": "0.04",
-                    "θ_r": "0.067",
-                    "ν_ss_quartz": "0.1",
-                    "ν_ss_om": "0.1",
-                    "ν_ss_gravel": "0.0",
-                    "κ_quartz": "7.7",
-                    "κ_minerals": "2.5",
-                    "κ_om": "0.25",
-                    "κ_liq": "0.57",
-                    "κ_ice": "2.29",
-                    "κ_air": "0.025",
-                    "ρp": "2700",
-                    "z_0m_soil": "0.1",
-                    "z_0b_soil": "0.1",
-                    "soil_ϵ": "0.98",
-                    "soil_α_PAR": "0.2",
-                    "soil_α_NIR": "0.2"
-                }
-            ],
-            "radiative_transfer": [
-                {
-                    "Ω": "0.69",
-                    "ld": "0.5",
-                    "α_PAR_leaf": "0.1",
-                    "λ_γ_PAR": "5e-7",
-                    "λ_γ_NIR": "1.65e-6",
-                    "τ_PAR_leaf": "0.05",
-                    "α_NIR_leaf": "0.45",
-                    "τ_NIR_leaf": "0.25",
-                    "n_layers": "20",
-                    "ϵ_canopy": "0.97"
-                }
-            ],
-            "conductance": [
-                {
-                    "g1": "141",
-                    "Drel": "1.6",
-                    "g0": "1e-4"
-                }
-            ],
-            "photosynthesis": [
-                {
-                    "oi": "0.209",
-                    "ϕ": "0.6",
-                    "θj": "0.9",
-                    "f": "0.015",
-                    "sc": "2e-6",
-                    "pc": "-2e6",
-                    "Vcmax25": "9e-5",
-                    "Γstar25": "4.275e-5",
-                    "Kc25": "4.049e-4",
-                    "Ko25": "0.2874",
-                    "To": "298.15",
-                    "ΔHkc": "79430",
-                    "ΔHko": "36380",
-                    "ΔHVcmax": "58520",
-                    "ΔHΓstar": "37830",
-                    "ΔHJmax": "43540",
-                    "ΔHRd": "46390"
-                }
-            ],
-            "plant_hydraulics": [
-                {
-                    "SAI": "1.0",
-                    "f_root_to_shoot": "3.5",
-                    "K_sat_plant": "5e-9",
-                    "ψ63": "-408.163",
-                    "weibull_param": "4",
-                    "a": "0.00049",
-                    "capacity": "10",
-                    "plant_S_s": "0.000098",
-                    "rooting_depth": "0.5",
-                    "z0_m": "2",
-                    "z0_b": "0.2"
-                }
-            ]
+    "datafile": "https://caltech.box.com/shared/static/1uwg8rjg2wx7y0vp8j9kv2d44y3fajyk.csv",
+    "params": {
+        "location": {
+            "latitude": "45.95",
+            "longitude": "-90.25",
+            "timezone": "6"
+        },
+        "autotrophic_respiration": {
+            "ne": "8e-4",
+            "ηsl": "0.01",
+            "σl": "0.05",
+            "μr": "1.0",
+            "μs": "0.1",
+            "f1":"0.012",
+            "f2":"0.25"
+        },
+        "soil": {
+            "soil_ν": "0.5",
+            "soil_K_sat": "4e-7",
+            "soil_S_s": "1e-4",
+            "soil_vg_n": "2.05",
+            "soil_vg_α": "0.04",
+            "θ_r": "0.067",
+            "ν_ss_quartz": "0.1",
+            "ν_ss_om": "0.1",
+            "ν_ss_gravel": "0.0",
+            "κ_quartz": "7.7",
+            "κ_minerals": "2.5",
+            "κ_om": "0.25",
+            "κ_liq": "0.57",
+            "κ_ice": "2.29",
+            "κ_air": "0.025",
+            "ρp": "2700",
+            "z_0m_soil": "0.1",
+            "z_0b_soil": "0.1",
+            "soil_ϵ": "0.98",
+            "soil_α_PAR": "0.2",
+            "soil_α_NIR": "0.2"
+        },
+        "radiative_transfer": {
+            "Ω": "0.69",
+            "ld": "0.5",
+            "α_PAR_leaf": "0.1",
+            "λ_γ_PAR": "5e-7",
+            "λ_γ_NIR": "1.65e-6",
+            "τ_PAR_leaf": "0.05",
+            "α_NIR_leaf": "0.45",
+            "τ_NIR_leaf": "0.25",
+            "n_layers": "20",
+            "ϵ_canopy": "0.97"
+        },
+        "conductance": {
+            "g1": "141",
+            "Drel": "1.6",
+            "g0": "1e-4"
+        },
+        "photosynthesis": {
+            "oi": "0.209",
+            "ϕ": "0.6",
+            "θj": "0.9",
+            "f": "0.015",
+            "sc": "2e-6",
+            "pc": "-2e6",
+            "Vcmax25": "9e-5",
+            "Γstar25": "4.275e-5",
+            "Kc25": "4.049e-4",
+            "Ko25": "0.2874",
+            "To": "298.15",
+            "ΔHkc": "79430",
+            "ΔHko": "36380",
+            "ΔHVcmax": "58520",
+            "ΔHΓstar": "37830",
+            "ΔHJmax": "43540",
+            "ΔHRd": "46390"
+        },
+        "plant_hydraulics": {
+            "SAI": "1.0",
+            "f_root_to_shoot": "3.5",
+            "K_sat_plant": "5e-9",
+            "ψ63": "-408.163",
+            "weibull_param": "4",
+            "a": "0.00049",
+            "capacity": "10",
+            "plant_S_s": "0.000098",
+            "rooting_depth": "0.5",
+            "z0_m": "2",
+            "z0_b": "0.2"
         }
-    ]
+    }
 }

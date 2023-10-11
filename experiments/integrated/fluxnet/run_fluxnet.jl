@@ -22,11 +22,12 @@ earth_param_set = create_lsm_parameters(FT)
 climalsm_dir = pkgdir(ClimaLSM)
 
 # Retrieve the data file locations
-file_map = Dict("ozark"=>("ozark.json", "https://caltech.box.com/shared/static/1uwg8rjg2wx7y0vp8j9kv2d44y3fajyk.csv"))
-file_locations = file_map[ARGS[1]]
+file_map = Dict("ozark"=>("ozark.json"))
+json_file = file_map[ARGS[1]]
 
 # Load site parameters from JSON file
-params = JSON.parsefile(joinpath(climalsm_dir, "experiments/integrated/fluxnet/$(file_locations[1])"))["params"]
+json_data =  JSON.parsefile(joinpath(climalsm_dir, "experiments/integrated/fluxnet/$(json_file)"))
+params = json_data["params"]
 
 # This reads in the data from the flux tower site and creates
 # the atmospheric and radiative driver structs for the model
@@ -44,7 +45,7 @@ include(
 # Now we set up the model. For the soil model, we pick
 # a model type and model args:
 soil_domain = land_domain
-soil_params = params[1]["soil"][1]
+soil_params = params["soil"]
 soil_ν = parse(FT, soil_params["soil_ν"])
 soil_vg_α = parse(FT, soil_params["soil_vg_α"])
 soil_vg_n = parse(FT, soil_params["soil_vg_n"])
@@ -97,7 +98,7 @@ canopy_component_types = (;
 )
 # Individual Component arguments
 # Set up autotrophic respiration
-ar_params = params[1]["autotrophic_respiration"][1]
+ar_params = params["autotrophic_respiration"]
 autotrophic_respiration_args = (;
     parameters = AutotrophicRespirationParameters{FT}(;
         ne = parse(FT, ar_params["ne"]),
@@ -110,7 +111,7 @@ autotrophic_respiration_args = (;
     )
 )
 # Set up radiative transfer
-rt_params = params[1]["radiative_transfer"][1]
+rt_params = params["radiative_transfer"]
 radiative_transfer_args = (;
     parameters = TwoStreamParameters{FT}(;
         Ω = parse(FT, rt_params["Ω"]),
@@ -126,7 +127,7 @@ radiative_transfer_args = (;
     )
 )
 # Set up conductance
-sc_params = params[1]["conductance"][1]
+sc_params = params["conductance"]
 conductance_args = (;
     parameters = MedlynConductanceParameters{FT}(;
         g1 = parse(FT, sc_params["g1"]),
@@ -135,7 +136,7 @@ conductance_args = (;
     )
 )
 # Set up photosynthesis
-photo_params = params[1]["photosynthesis"][1]
+photo_params = params["photosynthesis"]
 photosynthesis_args = (;
     parameters = FarquharParameters{FT}(
         Canopy.C3();
@@ -159,7 +160,7 @@ photosynthesis_args = (;
     )
 )
 # Set up plant hydraulics
-ph_params = params[1]["plant_hydraulics"][1]
+ph_params = params["plant_hydraulics"]
 SAI = parse(FT, ph_params["SAI"])
 maxLAI = maximum([LAIfunction(t) for t in seconds])
 RAI = (SAI + maxLAI) * parse(FT, ph_params["f_root_to_shoot"])
@@ -282,7 +283,10 @@ sol = SciMLBase.solve(
 
 # Plotting
 daily = sol.t ./ 3600 ./ 24
-savedir = joinpath(climalsm_dir, "experiments/integrated/fluxnet/")
+savedir = joinpath(climalsm_dir, "experiments/integrated/fluxnet/$(ARGS[1])")
+if !isdir(savedir)
+    mkdir(savedir)
+end
 # Number of datapoints per day
 data_daily_points = Int64(86400 / DATA_DT)
 # Number of model points per day
@@ -689,4 +693,4 @@ if length(ARGS) > 1 && ARGS[2] == "save"
     @info "Saved model output to $(savedir)model_output.csv"
 end
 
-rm(joinpath(savedir, "Artifacts.toml"))
+rm(joinpath(climalsm_dir, "experiments/integrated/fluxnet/Artifacts.toml"))
