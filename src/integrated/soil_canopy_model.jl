@@ -177,12 +177,20 @@ interaction_vars(m::SoilCanopyModel) = (
     :soil_shf,
     :soil_lhf,
     :T_soil,
+    :ρ_soil,
+    :q_soil,
     :α_soil,
     :ϵ_soil,
+    :q_canopy,
     :canopy_LW_n,
     :canopy_SW_n,
     :LW_out,
     :SW_out,
+    :ustar,
+    :T_canopy_air,
+    :q_canopy_air,
+    :shf,
+    :lhf
 )
 
 """
@@ -192,7 +200,7 @@ The types of the additional auxiliary variables that are
 included in the integrated Soil-Canopy model.
 """
 interaction_types(m::SoilCanopyModel{FT}) where {FT} =
-    (FT, FT, FT, FT, FT, FT, FT, FT, FT, FT, FT, FT, FT)
+    (FT, FT, FT, FT, FT, FT, FT, FT, FT, FT, FT, FT, FT, FT, FT, FT, FT, FT, FT, FT, FT)
 
 """
     interaction_domain_names(m::SoilCanopyModel)
@@ -202,6 +210,14 @@ included in the integrated Soil-Canopy model.
 """
 interaction_domain_names(m::SoilCanopyModel) = (
     :subsurface,
+    :surface,
+    :surface,
+    :surface,
+    :surface,
+    :surface,
+    :surface,
+    :surface,
+    :surface,
     :surface,
     :surface,
     :surface,
@@ -263,15 +279,62 @@ function make_interactions_update_aux(
             ) *
             (land.canopy.hydraulics.parameters.root_distribution(z))
 
-        # Soil boundary fluxes under canopy or for bare soil
-        bc = land.soil.boundary_conditions.top
-        soil_conditions = surface_fluxes(bc.atmos, land.soil, Y, p, t)
-        @. p.soil_shf = soil_conditions.shf
-        @. p.soil_evap = soil_conditions.vapor_flux
-        @. p.soil_lhf = soil_conditions.lhf
-        p.T_soil .= surface_temperature(land.soil, Y, p, t)
-        p.α_soil .= surface_albedo(land.soil, Y, p)
+        earth_param_set = land.soil.parameters.earth_param_set
         p.ϵ_soil .= surface_emissivity(land.soil, Y, p)
+        p.T_soil .= ClimaLSM.surface_temperature(land.soil, Y, p, t)
+        p.ρ_soil .= ClimaLSM.surface_air_density(land.soil.boundary_conditions.top.atmos, land.soil, Y, p, t, p.T_soil)
+        p.q_soil .= ClimaLSM.surface_specific_humidity(land.soil, Y, p, p.T_soil, p.ρ_soil)
+
+        # solve for T_canopy_air, q_canopy_air, ustar; update in place
+        canopy_airspace_solve!(p, Y, t, earth_param_set, land, land.canopy.atmos)
+
+        ustar = p.ustar
+
+        _ρ_liq = LSMP.ρ_cloud_liq(earth_param_set)
+        thermo_params = LSMP.thermodynamic_parameters(earth_param_set)
+        _LH_v0 = LSMP.LH_v0(earth_param_set)
+        d_leaf = 0.04
+        Cv = 0.01
+        Cs_canopy = 0.004
+        Cs_bare =@.  0.4/0.13*(0.01*ustar/(1.5e-5))^(-0.45)
+        AI = @. p.canopy.hydraulics.area_index.leaf+p.canopy.hydraulics.area_index.stem
+        W = @. exp(-AI)
+        Cs = @. W*Cs_bare + (1-W)*Cs_canopy
+        r_b = @. 1/Cv*(ustar/d_leaf)^-0.5/AI
+        r_ah_cs = @. 1/Cs/ustar
+        r_aw_cs = r_ah_cs
+        r_soil = ClimaLSM.surface_resistance(land.soil, Y, p, t)
+        r_canopy = ClimaLSM.surface_resistance(land.canopy, Y, p, t) .+ r_b
+        
+        ts_in = construct_atmos_ts(land.canopy.atmos, t, thermo_params)
+        ρ_air = Thermodynamics.air_density(thermo_params, ts_in)
+        cp_m = Thermodynamics.cp_m(thermo_params, ts_in)
+
+        @. p.soil_shf = -ρ_air * cp_m * (p.T_canopy_air - p.T_soil) / r_ah_cs
+        @. p.soil_evap = -ρ_air * (p.q_canopy_air - p.q_soil) / (r_aw_cs + r_soil) ./ _ρ_liq
+        @. p.soil_lhf = p.soil_evap * _LH_v0 * _ρ_liq 
+
+        # Compute transpiration using T_canopy
+        p.q_canopy .=  ClimaLSM.surface_specific_humidity(land.canopy, Y, p, p.T_canopy_air, ρ_air)
+        @. p.canopy.energy.shf  = -ρ_air * cp_m * (p.T_canopy_air - p.T_canopy_air) / r_b # equals zero, in this assumption
+        @. p.canopy.conductance.transpiration = -ρ_air * (p.q_canopy_air - p.q_canopy) / r_canopy / _ρ_liq
+        @. p.canopy.energy.lhf  = p.canopy.conductance.transpiration * _LH_v0 * _ρ_liq
+
+
+        # Transpiration is per unit ground area, not leaf area (mult by LAI)
+        fa = p.canopy.hydraulics.fa
+        hydraulics = land.canopy.hydraulics
+        n_stem = hydraulics.n_stem
+        n_leaf = hydraulics.n_leaf
+        i_end = n_stem + n_leaf
+
+        fa.:($i_end) .= PlantHydraulics.transpiration_per_ground_area(
+            hydraulics.transpiration,
+            Y,
+            p,
+            t,
+        )
+
         lsm_radiation_update!(
             p,
             land.canopy.radiative_transfer,
@@ -285,6 +348,104 @@ function make_interactions_update_aux(
     return update_aux!
 end
 
+
+function canopy_airspace_solve!(p, Y, t, earth_param_set, land, atmos)
+    FT = Float64
+    T_soil = parent(p.T_soil)[1]
+    ρ_soil = parent(p.ρ_soil)[1]
+    q_soil = parent(p.q_soil)[1]
+
+
+    earth_param_set = land.soil.parameters.earth_param_set
+    _ρ_liq = LSMP.ρ_cloud_liq(earth_param_set)
+    thermo_params = LSMP.thermodynamic_parameters(earth_param_set)
+    _LH_v0 = LSMP.LH_v0(earth_param_set)
+    d_leaf = 0.04
+    Cv = 0.01
+    Cs_canopy = 0.004
+    u = atmos.u(t)
+    h = atmos.h
+    ts_in = construct_atmos_ts(atmos, t, thermo_params)
+    ρ_air = Thermodynamics.air_density(thermo_params, ts_in)
+    cp_m = Thermodynamics.cp_m(thermo_params, ts_in)
+    ρ_sfc = ρ_air
+    h_sfc = FT(18.5)
+    z_0m = FT(0.1)*h_sfc
+    z_0b = FT(0.1)*z_0m
+    d_sfc = FT(0.67)*h_sfc
+    surface_flux_params = LSMP.surface_fluxes_parameters(earth_param_set)
+    AI = parent(p.canopy.hydraulics.area_index.leaf .+p.canopy.hydraulics.area_index.stem)[1]
+    W = @. exp(-AI)
+    r_soil = parent(ClimaLSM.surface_resistance(land.soil, Y, p, t))[1]
+    r_stomata = parent(ClimaLSM.surface_resistance(land.canopy, Y, p, t))[1]
+    initial_guess = [0.5 .*(atmos.T(t) .+ T_soil), 0.5 .*(atmos.q(t) .+ q_soil), u/2, 0.0, 0.0]
+    function flux_equality(F, x)
+        # call surface fluxes between z_0+d and atmos
+        isnan(x[1]) ? x[1] = atmos.T(t) : nothing
+        isnan(x[2]) ? x[2] = atmos.q(t) : nothing
+
+        TS = x[1]
+        qS = x[2]
+        ts_sfc = Thermodynamics.PhaseEquil_ρTq(thermo_params, ρ_sfc, TS, qS)
+        state_sfc =
+            SurfaceFluxes.SurfaceValues(h_sfc - d_sfc, SVector{2, FT}(0, 0), ts_sfc)
+        state_in =
+            SurfaceFluxes.InteriorValues(h - d_sfc, SVector{2, FT}(u, 0), ts_in)
+        
+        sc = SurfaceFluxes.ValuesOnly{FT}(;
+                                          state_in,
+                                          state_sfc,
+                                          z0m = z_0m,
+                                          z0b = z_0b,
+                                          gustiness = atmos.gustiness,
+                                          )
+
+        
+        conditions = SurfaceFluxes.surface_conditions(
+            surface_flux_params,
+            sc;
+            tol_neutral = SFP.cp_d(surface_flux_params) / 100000,
+        )
+        r_a = 1 / (conditions.Ch * SurfaceFluxes.windspeed(sc))
+        ustar = conditions.ustar
+        x[3] = ustar
+        x[4] = conditions.shf
+        x[5] = conditions.lhf
+        Cs_bare =@.  0.4/0.13*(0.01*ustar/(1.5e-5))^(-0.45)
+        Cs = @. W*Cs_bare + (1-W)*Cs_canopy
+        r_b = @. 1/Cv*(ustar/d_leaf)^-0.5/AI
+        r_ah_cs = @. 1/Cs/ustar
+        r_aw_cs = r_ah_cs
+        r_canopy = r_stomata .+ r_b
+        soil_shf = -ρ_air * cp_m * (TS - T_soil) / r_ah_cs
+        soil_evap = -ρ_air * (qS - q_soil) / (r_aw_cs + r_soil)
+
+        # Compute transpiration using T_canopy
+        q_canopy =  ClimaLSM.surface_specific_humidity(land.canopy, Y, p, TS, ρ_air)
+        canopy_shf  = -ρ_air * cp_m * (TS - TS) / r_b # equals zero, in this assumption
+        canopy_evap = -ρ_air * (qS - q_canopy) / r_canopy
+        F[1] = (canopy_evap + soil_evap - conditions.evaporation) * _LH_v0
+        F[2] = canopy_shf + soil_shf - conditions.shf
+        F[3] = 0.0
+        F[4] = 0.0
+        F[5] = 0.0
+    end
+    soln = nlsolve(
+        flux_equality,
+        initial_guess,
+        ftol = 1e-11,
+    )
+    p.T_canopy_air .= soln.zero[1]
+    p.q_canopy_air .= soln.zero[2]
+    p.ustar .= soln.zero[3]
+    p.shf .= soln.zero[4]
+    p.lhf .= soln.zero[5]
+
+end
+    
+
+    
+    
 """
     net_radiation_at_ground(
         canopy_radiation::Canopy.AbstractRadiationModel{FT},
@@ -324,10 +485,10 @@ function lsm_radiation_update!(
     T_canopy =
         ClimaLSM.Canopy.canopy_temperature(canopy.energy, canopy, Y, p, t)
     T_soil = p.T_soil
+    ϵ_soil = p.ϵ_soil
+    
     α_soil_PAR = Canopy.ground_albedo_PAR(canopy)
     α_soil_NIR = Canopy.ground_albedo_NIR(canopy)
-
-    ϵ_soil = p.ϵ_soil
     # in W/m^2
     PAR = p.canopy.radiative_transfer.par
     NIR = p.canopy.radiative_transfer.nir

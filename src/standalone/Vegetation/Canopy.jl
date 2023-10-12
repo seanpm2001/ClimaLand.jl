@@ -206,6 +206,7 @@ canopy_components(::CanopyModel) = (
     :photosynthesis,
     :radiative_transfer,
     :autotrophic_respiration,
+    :energy
 )
 
 """
@@ -421,7 +422,6 @@ function ClimaLSM.make_update_aux(
         β = p.canopy.hydraulics.β
         medlyn_factor = p.canopy.conductance.medlyn_term
         gs = p.canopy.conductance.gs
-        transpiration = p.canopy.conductance.transpiration
         An = p.canopy.photosynthesis.An
         GPP = p.canopy.photosynthesis.GPP
         Rd = p.canopy.photosynthesis.Rd
@@ -578,17 +578,6 @@ function ClimaLSM.make_update_aux(
             Rd,
             β,
             h,
-        )
-        # Compute transpiration using T_canopy
-        (canopy_transpiration, shf, lhf) =
-            canopy_surface_fluxes(canopy.atmos, canopy, Y, p, t)
-        transpiration .= canopy_transpiration
-        # Transpiration is per unit ground area, not leaf area (mult by LAI)
-        fa.:($i_end) .= PlantHydraulics.transpiration_per_ground_area(
-            hydraulics.transpiration,
-            Y,
-            p,
-            t,
         )
 
     end

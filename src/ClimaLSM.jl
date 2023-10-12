@@ -1,6 +1,7 @@
 module ClimaLSM
 using UnPack
 using DocStringExtensions
+using NLsolve
 
 using ClimaCore
 import ClimaCore: Fields, Spaces
