@@ -360,35 +360,35 @@ function canopy_airspace_solve!(p, Y, t, earth_param_set, land, atmos)
     _ρ_liq = LSMP.ρ_cloud_liq(earth_param_set)
     thermo_params = LSMP.thermodynamic_parameters(earth_param_set)
     _LH_v0 = LSMP.LH_v0(earth_param_set)
-    d_leaf = 0.04
-    Cv = 0.01
-    Cs_canopy = 0.004
+    surface_flux_params = LSMP.surface_fluxes_parameters(earth_param_set)
+    
     u = atmos.u(t)
     h = atmos.h
     ts_in = construct_atmos_ts(atmos, t, thermo_params)
     ρ_air = Thermodynamics.air_density(thermo_params, ts_in)
     cp_m = Thermodynamics.cp_m(thermo_params, ts_in)
-    ρ_sfc = ρ_air
+
     h_sfc = FT(18.5)
     z_0m = FT(0.1)*h_sfc
     z_0b = FT(0.1)*z_0m
     d_sfc = FT(0.67)*h_sfc
-    surface_flux_params = LSMP.surface_fluxes_parameters(earth_param_set)
+
+
+    d_leaf = 0.04
+    Cv = 0.01
+    Cs_canopy = 0.004
+    LAI =  parent(p.canopy.hydraulics.area_index.leaf)[1]
     AI = parent(p.canopy.hydraulics.area_index.leaf .+p.canopy.hydraulics.area_index.stem)[1]
     W = @. exp(-AI)
     r_soil = parent(ClimaLSM.surface_resistance(land.soil, Y, p, t))[1]
-    r_stomata = parent(ClimaLSM.surface_resistance(land.canopy, Y, p, t))[1]
+    r_stomata = parent(ClimaLSM.surface_resistance(land.canopy, Y, p, t))[1] # canopy upscaled
     initial_guess = [0.5 .*(atmos.T(t) .+ T_soil), 0.5 .*(atmos.q(t) .+ q_soil), u/2, 0.0, 0.0]
     function flux_equality(F, x)
-        # call surface fluxes between z_0+d and atmos
-        isnan(x[1]) ? x[1] = atmos.T(t) : nothing
-        isnan(x[2]) ? x[2] = atmos.q(t) : nothing
-
         TS = x[1]
         qS = x[2]
-        ts_sfc = Thermodynamics.PhaseEquil_ρTq(thermo_params, ρ_sfc, TS, qS)
+        ts_sfc = Thermodynamics.PhaseEquil_ρTq(thermo_params, ρ_air, TS, qS)
         state_sfc =
-            SurfaceFluxes.SurfaceValues(h_sfc - d_sfc, SVector{2, FT}(0, 0), ts_sfc)
+            SurfaceFluxes.SurfaceValues(FT(0), SVector{2, FT}(0, 0), ts_sfc)
         state_in =
             SurfaceFluxes.InteriorValues(h - d_sfc, SVector{2, FT}(u, 0), ts_in)
         
@@ -400,7 +400,7 @@ function canopy_airspace_solve!(p, Y, t, earth_param_set, land, atmos)
                                           gustiness = atmos.gustiness,
                                           )
 
-        
+        # Canopy airspace at z0+d and atmos at h
         conditions = SurfaceFluxes.surface_conditions(
             surface_flux_params,
             sc;
@@ -411,19 +411,22 @@ function canopy_airspace_solve!(p, Y, t, earth_param_set, land, atmos)
         x[3] = ustar
         x[4] = conditions.shf
         x[5] = conditions.lhf
+        
         Cs_bare =@.  0.4/0.13*(0.01*ustar/(1.5e-5))^(-0.45)
         Cs = @. W*Cs_bare + (1-W)*Cs_canopy
-        r_b = @. 1/Cv*(ustar/d_leaf)^-0.5/AI
+        r_b = @. 1/Cv*(ustar/d_leaf)^-0.5 # not upscaled for the canopy
         r_ah_cs = @. 1/Cs/ustar
-        r_aw_cs = r_ah_cs
-        r_canopy = r_stomata .+ r_b
+        
         soil_shf = -ρ_air * cp_m * (TS - T_soil) / r_ah_cs
-        soil_evap = -ρ_air * (qS - q_soil) / (r_aw_cs + r_soil)
+        soil_evap = -ρ_air * (qS - q_soil) / (r_ah_cs + r_soil)
 
-        # Compute transpiration using T_canopy
-        q_canopy =  ClimaLSM.surface_specific_humidity(land.canopy, Y, p, TS, ρ_air)
-        canopy_shf  = -ρ_air * cp_m * (TS - TS) / r_b # equals zero, in this assumption
-        canopy_evap = -ρ_air * (qS - q_canopy) / r_canopy
+        Tc = TS
+        q_canopy =  ClimaLSM.surface_specific_humidity(land.canopy, Y, p, Tc, ρ_air)
+        canopy_shf  = -ρ_air * cp_m * (TS - Tc) / (r_b/AI)
+        canopy_evap = -ρ_air * (qS - q_canopy) / (r_stomata + r_b/LAI)
+
+        #shf = -ρ_air * cp_m * (atmos.T(t) - TS) / r_a
+        #E = -ρ_air *(atmos.q(t) - qS) / r_a
         F[1] = (canopy_evap + soil_evap - conditions.evaporation) * _LH_v0
         F[2] = canopy_shf + soil_shf - conditions.shf
         F[3] = 0.0
@@ -433,7 +436,7 @@ function canopy_airspace_solve!(p, Y, t, earth_param_set, land, atmos)
     soln = nlsolve(
         flux_equality,
         initial_guess,
-        ftol = 1e-11,
+        xtol = 1.0,
     )
     p.T_canopy_air .= soln.zero[1]
     p.q_canopy_air .= soln.zero[2]

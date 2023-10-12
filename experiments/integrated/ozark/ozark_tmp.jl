@@ -232,12 +232,12 @@ prob = SciMLBase.ODEProblem(
 );
 
 integrator = SciMLBase.init(prob, ode_algo; dt = dt,callback = cb, saveat = saveat, adaptive = false)
-n_steps = Int64((tf-t0)/dt)
-for step in 1:1092#n_steps
-    @info(integrator.t ./ 24 ./ 3600)
+n_steps = Int64((tf-t0)/dt)-1
+for step in 1:nsteps
+    @info(step)
     SciMLBase.step!(integrator)
 end
-
+#=
 model_GPP = [
     parent(sv.saveval[k].canopy.photosynthesis.GPP)[1] for
     k in 1:1091
@@ -291,3 +291,4 @@ plt2 = Plots.plot(
 Plots.plot(plt2, plt1, layout = grid(2, 1, heights = [0.2, 0.8]))
 
 SHF = [parent(sv.saveval[k].soil_shf)[1] for k in 1:length(sol.t)]
+=#
