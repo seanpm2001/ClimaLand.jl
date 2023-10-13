@@ -1,4 +1,4 @@
-# Uses data and computes fluxes using a CLM-style model
+# Uses data and computes fluxes using a parallel flux model
 using ClimaCore
 import CLIMAParameters as CP
 using Plots
@@ -204,10 +204,6 @@ r_canopy = 1 ./ g_canopy
 ψ_soil = @. ClimaLSM.Soil.matric_potential(hcm, (SWC - θ_r)/(0.52-θ_r))
 r_soil = ClimaLSM.Soil.soil_resistance.(SWC, SWC, 0.0, soil_params)
 ϵ_soil = 0.96
-# Needed to compute resistances, below.
-AI = SAI .+ LAI
-W = @. exp(-AI) # CLM Equation 2.5.119
-
 
 ts_in = @. Thermodynamics.PhaseEquil_pTq(thermo_params, P_air, T_air, q_air)
 ρ_air = @. Thermodynamics.air_density(thermo_params, ts_in)
@@ -227,101 +223,82 @@ q_soil= @. (q_sat_soil * exp(grav * ψ_soil * M_w / (R * T_soil))) # Bonan's boo
 
 
 # Variables we will save
-T_airspace_model = []
-q_airspace_model = []
 T_canopy_model = []
-shf = []
-lhf = []
 soil_shf = []
 soil_lhf = []
 canopy_lhf = []
 canopy_shf = []
-ustar_model = []
 LW_out_model = []
 LW_canopy = []
 LW_soil = []
-L_MO = []
-
-
+diagnostic = false
 # step through the data and compute surface fluxes according to the model
 steps = 120*48:1:180*48
-# Errors on near step 7314
-for step in 120*48:1:7313
+for step in steps
     @info(step)
-    # Tairspace, qairspace, Tcanopy, ustar, shf, lhf, LMO. Only the first three are optimized, so we set F[4:7] = 0.
-    initial_guess = [0.5 .*(T_air[step] .+ T_soil[step]), 0.5 .*(q_air[step] .+ q_soil[step]), 0.5 .*(T_air[step] .+ T_soil[step]), u_air[step], 0.0, 0.0, 0.0]
-    function flux_equality(F, x)
-        # Compute the surface fluxes between the airspace and the atmosphere. CLM 2.5.100 and CLM2.5.87. See discussion right after 2.5.92.
-        # The surface corresponds to the canopy airspace, with values at height z_0+d
-        T_airspace = x[1]
-        q_airspace = x[2]
-        T_canopy = x[3]
-        
-        ts_sfc = Thermodynamics.PhaseEquil_ρTq(thermo_params, ρ_air[step], T_airspace, q_airspace)
-        airspace_atmos_fluxes =  atmos_airspace_fluxes(ts_sfc, ts_in[step], h, d_sfc, u_air[step],z_0m, z_0b, surface_flux_params)
-        ustar = airspace_atmos_fluxes.ustar
-        soil_fluxes = airspace_soil_fluxes(ustar, T_airspace, q_airspace, W[step], T_soil[step], q_soil[step], r_soil[step], ρ_air[step], cp_m[step], h-d_sfc)
-        canopy_fluxes = airspace_canopy_fluxes(ustar, T_airspace, q_airspace, T_canopy, ρ_air[step], cp_m[step], LAI[step], AI[step], r_canopy[step])
-        lw_fluxes = land_lw_fluxes(LW_d[step], T_canopy, T_soil[step], ϵ_soil, ϵ_canopy, _σ)
-        # Functions to find the roots of:
-        F[1] = canopy_fluxes.shf + soil_fluxes.shf - airspace_atmos_fluxes.shf
-        F[2] = (canopy_fluxes.transpiration + soil_fluxes.evaporation - airspace_atmos_fluxes.evaporation) * _LH_v0
-        F[3] = (-lw_fluxes.LW_canopy - SW_canopy[step] + canopy_fluxes.transpiration * _LH_v0 + canopy_fluxes.shf)
-        F[4] = 0.0
-        F[5] = 0.0
-        F[6] = 0.0
-        F[7] = 0.0
-
-        # Store latest values from this iteration.
-        x[4] = ustar
-        x[5] = airspace_atmos_fluxes.shf
-        x[6] = airspace_atmos_fluxes.lhf
-        x[7] = airspace_atmos_fluxes.L_MO
+    if diagnostic
+        # Diagnostic T canopy
+        initial_guess =  [0.5 .*(T_air[step] .+ T_soil[step])]
+        function flux_equality(F, x)
+            T_canopy = x[1]
+            q_canopy =  
+                Thermodynamics.q_vap_saturation_generic(
+                    thermo_params,
+                    T_canopy,
+                    ρ_air[step],
+                    Thermodynamics.Liquid(),
+                )
+            ts_canopy = Thermodynamics.PhaseEquil_ρTq(thermo_params, ρ_air[step], T_canopy, q_canopy)
+            canopy_fluxes =  atmos_sfc_fluxes(ts_canopy, ts_in[step], h, d_sfc, u_air[step],z_0m, z_0b, surface_flux_params, thermo_params, r_canopy[step])
+            lw_fluxes = land_lw_fluxes(LW_d[step], T_canopy, T_soil[step], ϵ_soil, ϵ_canopy, _σ)
+            # Functions to find the roots of:
+            F[1] = (-lw_fluxes.LW_canopy - SW_canopy[step] + canopy_fluxes.evaporation * _LH_v0 + canopy_fluxes.shf)
+        end
+        soln = nlsolve(
+            flux_equality,
+            initial_guess,
+            ftol = 1e-8,
+            iterations = 100
+        )
+        T_canopy = soln.zero[1]
+        push!(T_canopy_model, T_canopy)
+    else
+        push!(T_canopy_model, T_air[step])
     end
-    soln = nlsolve(
-        flux_equality,
-        initial_guess,
-        ftol = 1e-8,
-        iterations = 100
-    )
-    T_airspace = soln.zero[1]
-    q_airspace = soln.zero[2]
-    T_canopy = soln.zero[3]
-    ustar= soln.zero[4]
-
-    soil_fluxes = airspace_soil_fluxes(ustar, T_airspace, q_airspace, W[step], T_soil[step], q_soil[step], r_soil[step], ρ_air[step], cp_m[step], h-d_sfc)
-    canopy_fluxes = airspace_canopy_fluxes(ustar, T_airspace, q_airspace, T_canopy, ρ_air[step], cp_m[step], LAI[step], AI[step], r_canopy[step])
+    T_canopy = T_canopy_model[end] # valuefor this step
+    q_canopy =  
+        Thermodynamics.q_vap_saturation_generic(
+            thermo_params,
+            T_canopy,
+            ρ_air[step],
+            Thermodynamics.Liquid(),
+            )
+    ts_canopy = Thermodynamics.PhaseEquil_ρTq(thermo_params, ρ_air[step], T_canopy, q_canopy)
+    canopy_fluxes =  atmos_sfc_fluxes(ts_canopy, ts_in[step], h, d_sfc, u_air[step],z_0m, z_0b, surface_flux_params, thermo_params, r_canopy[step])
     lw_fluxes = land_lw_fluxes(LW_d[step], T_canopy, T_soil[step], ϵ_soil, ϵ_canopy, _σ)
-                       
+    ts_soil =  Thermodynamics.PhaseEquil_ρTq(thermo_params, ρ_air[step], T_soil[step], q_soil[step])
+    soil_fluxes = atmos_sfc_fluxes(ts_soil, ts_in[step], h, 0.0, u_air[step],0.01, 0.001, surface_flux_params, thermo_params, r_soil[step])
 
     # Save output
-    push!(T_airspace_model, T_airspace)
-    push!(q_airspace_model, q_airspace)
-    push!(ustar_model, ustar)
-    push!(shf, soln.zero[5])
-    push!(lhf, soln.zero[6])
-    push!(L_MO, soln.zero[7])
-
     push!(soil_shf, soil_fluxes.shf)
     push!(soil_lhf, soil_fluxes.evaporation * _LH_v0)
-    push!(canopy_lhf, canopy_fluxes.transpiration * _LH_v0)
+    push!(canopy_lhf, canopy_fluxes.evaporation * _LH_v0)
     push!(canopy_shf,  canopy_fluxes.shf)
     push!(LW_canopy, lw_fluxes.LW_canopy)
-    push!(T_canopy_model, T_canopy)
     push!(LW_out_model,lw_fluxes.LW_out)
     push!(LW_soil, lw_fluxes.LW_soil)
+              
 end
 
 
 # Plotting
-idx_end = length(T_airspace_model)
+idx_end = length(soil_shf)
 days = seconds[steps[1:idx_end]] ./ 24 ./ 3600
 
 # Weird spikes but not wrong immediately. due to MO solve?
-plt_temp = Plots.plot(days, T_airspace_model, label = "Airspace", title = "Temperature")
+plt_temp = Plots.plot(days, T_canopy_model, label = "Canopy", title = "Temperature")
 Plots.plot!(plt_temp, days, T_air[steps[1:idx_end]], label = "Atmos")
 Plots.plot!(plt_temp, days, T_soil[steps[1:idx_end]], label = "Soil")
-Plots.plot!(plt_temp, days, T_canopy_model, label = "Canopy")
 
 # Weird spikes but not wrong immediately
 plt_lw = Plots.plot(days, LW_out_model, label = "Model", title = "LW out")
@@ -330,11 +307,6 @@ Plots.plot!(plt_lw, days, LW_OUT[steps[1:idx_end]], label = "Data")
 plt_sw = Plots.plot(days, SW_out_model[steps[1:idx_end]], label = "Model", title = "SW out")
 Plots.plot!(plt_sw, days, SW_OUT[steps[1:idx_end]], label = "Data")
 
-# same spikes
-plot_q = Plots.plot(days, q_airspace_model, label = "Airspace", title = "q")
-Plots.plot!(plot_q, days, q_air[steps[1:idx_end]], label = "Atmos")
-Plots.plot!(plot_q, days, q_soil[steps[1:idx_end]], label = "Soil")
-
 # G still looks bad
 # For us, G is positive = Loss of heat from the ground -> add a sign to data
 plot_G = Plots.plot(days, soil_shf, label = "Soil SHF", title = "Ground heat flux")
@@ -342,24 +314,17 @@ Plots.plot!(plot_G, days, -1 .* LW_soil .- SW_soil[steps[1:idx_end]] .+ soil_shf
 Plots.plot!(plot_G, days, -1 .* G[steps[1:idx_end]], label = "Data")
 
 # Looks wrong all around
-plot_shf = Plots.plot(days, soil_shf, label  = "Soil-Airspace", title = "SHF")
-Plots.plot!(plot_shf, days, canopy_shf, label  = "Canopy-Airspace")
-Plots.plot!(plot_shf, days, shf, label  = "Airspace-Atmos")
+plot_shf = Plots.plot(days, soil_shf, label  = "Soil-Atmos", title = "SHF")
+Plots.plot!(plot_shf, days, canopy_shf, label  = "Canopy-Atmos")
 Plots.plot!(plot_shf, days, H[steps[1:idx_end]], label = "data",)
 
 # Looks pretty good
-plot_lhf = Plots.plot(days, soil_lhf, label  = "Soil-Airspace", title = "LHF")
-Plots.plot!(plot_lhf, days, canopy_lhf, label  = "Canopy-Airspace")
-Plots.plot!(plot_lhf, days, lhf, label  = "Airspace-Atmos")
+plot_lhf = Plots.plot(days, soil_lhf, label  = "Soil-Atmos", title = "LHF")
+Plots.plot!(plot_lhf, days, canopy_lhf, label  = "Canopy-Atmos")
 Plots.plot!(plot_lhf, days, LE[steps[1:idx_end]], label = "data")
 
-
-# Spikes when ustar -> 0?
-plot_ustar = Plots.plot(days, ustar_model, title = "Ustar")
-
-
 # Energy balance at the flux tower site:
-
-RminusG = @.(LW_d-LW_OUT) + (SW_d - SW_OUT)
-HplusL = LE .+ H
-Plots.scatter(RminusG, HplusL)
+recomputed_G = @. (-LE -H + (LW_d-LW_OUT) + (SW_d - SW_OUT))
+RplusG = @. (LW_d-LW_OUT) + (SW_d - SW_OUT) + G
+HplusL = H .+ L
+Plots.scatter(RplusG, HplusL)

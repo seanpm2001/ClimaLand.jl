@@ -61,10 +61,7 @@ TS = driver_data[2:end, column_names .== "TS_F_MDS_1"] .+ 273.15;# convert C to 
 replace_missing_with_mean!(TS, TS_F)
 GPP = driver_data[2:end, column_names .== "GPP_DT_VUT_REF"] .* 1e-6 # to convert from micromol to mol.
 LE = driver_data[2:end, column_names .== "LE_CORR"]
-H_CORR = driver_data[2:end, column_names .== "H_CORR"]
-H = driver_data[2:end, column_names .== "H_F_MDS"]
-H_F = driver_data[2:end, column_names .== "H_F_MDS_QC"]
-replace_missing_with_mean!(H, H_F)
+H = driver_data[2:end, column_names .== "H_CORR"]
 G = driver_data[2:end, column_names .== "G_F_MDS"]
 G_F = driver_data[2:end, column_names .== "G_F_MDS_QC"]
 replace_missing_with_mean!(G, G_F)
