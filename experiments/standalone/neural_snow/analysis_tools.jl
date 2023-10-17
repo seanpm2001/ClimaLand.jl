@@ -12,9 +12,16 @@ Print the current RAM usage (percentage).
 - `ret::Bool`: indicates whether to return the percentage as a number.
 """
 function show_mem_usage(ret::Bool = false)
-    used_mem = ((Sys.total_memory() / 2^20) - (Sys.free_memory() / 2^20)) / 1000.0
-    perc = 100.0 * (1.0 - Sys.free_memory()/Sys.total_memory())
-    print("RAM Usage: ", round(used_mem, digits = 3), " GB (", round(perc, digits = 2), "%)\n")
+    used_mem =
+        ((Sys.total_memory() / 2^20) - (Sys.free_memory() / 2^20)) / 1000.0
+    perc = 100.0 * (1.0 - Sys.free_memory() / Sys.total_memory())
+    print(
+        "RAM Usage: ",
+        round(used_mem, digits = 3),
+        " GB (",
+        round(perc, digits = 2),
+        "%)\n",
+    )
     if ret
         return used_mem
     end
@@ -95,7 +102,11 @@ Calculate the slope of the trendline between a predicted and true output, with o
 - `truth::Vector{<:Real}`: the true series.
 -  `offset:Bool`: indicates whether to include an offset instead of a direct proportionality.
 """
-function trendslope(pred::Vector{<:Real}, truth::Vector{<:Real}; offset::Bool=false)
+function trendslope(
+    pred::Vector{<:Real},
+    truth::Vector{<:Real};
+    offset::Bool = false,
+)
     if offset
         return [truth ones(length(truth))] \ pred
     end
@@ -113,7 +124,7 @@ Calculate the median of the percent error between all corresponding elements of 
 """
 function med_percent_err(pred::Vector{<:Real}, truth::Vector{<:Real})
     temp = abs.((pred .- truth)) ./ abs.(truth)
-    temp = temp[temp.<Inf]
+    temp = temp[temp .< Inf]
     return median(filter(!isnan, temp))
 end
 
@@ -127,7 +138,7 @@ Returns the L1 error of a predicted and true output, divided by the mean of all 
 - `truth::Vector{<:Real}`: the true series.
 """
 function pack_percent_err(pred::Vector{<:Real}, truth::Vector{<:Real})
-    return l1(pred, truth) ./ mean(truth[truth.>0.0])
+    return l1(pred, truth) ./ mean(truth[truth .> 0.0])
 end
 
 """
@@ -153,7 +164,11 @@ Return a vector of scoring metrics between a true and predicted output.
 - `truth::Vector{<:Real}`: the true series.
 - `timeseries::Bool`: indicates whether to include metrics for timeseries data
 """
-function get_scores(pred::Vector{<:Real}, truth::Vector{<:Real}; timeseries=false)
+function get_scores(
+    pred::Vector{<:Real},
+    truth::Vector{<:Real};
+    timeseries = false,
+)
     scores = zeros(0)
     push!(scores, l1(pred, truth))
     push!(scores, rmse(pred, truth))
@@ -179,7 +194,11 @@ Display formatted scoring metrics between a true and predicted output.
 - `truth::Vector{<:Real}`: the true series.
 - `timeseries::Bool`: indicates whether to include metrics for timeseries data
 """
-function display_scores(pred::Vector{<:Real}, truth::Vector{<:Real}; timeseries=false)
+function display_scores(
+    pred::Vector{<:Real},
+    truth::Vector{<:Real};
+    timeseries = false,
+)
     print("\n******** SCORES: *******\n")
     print("MAE:          ", l1(pred, truth), "\n")
     print("RMSE:         ", rmse(pred, truth), "\n")
@@ -207,10 +226,15 @@ Calculate the feature importance metrics via a random shuffling of input feature
 - `ret::Bool`: indicates whether to return the scores as a vector. Default is true.
 - `verbose::Bool`: indicates whether to print the scores as they are generated. Default is false.
 """
-function feature_importance(data::DataFrame, input_vars::Vector{Symbol}, target::Symbol, loss;
+function feature_importance(
+    data::DataFrame,
+    input_vars::Vector{Symbol},
+    target::Symbol,
+    loss;
     dtype::Type = Float32,
     ret::Bool = true,
-    verbose::Bool = false)
+    verbose::Bool = false,
+)
     #temp = model[:final_scale].weight[3,3]
     input_base = Matrix{dtype}(select(data, input_vars))'
     output = Vector{dtype}(data[!, target])'
@@ -223,8 +247,16 @@ function feature_importance(data::DataFrame, input_vars::Vector{Symbol}, target:
         newtrain[!, feature] .= shuffle_feature
         newinput = Matrix{dtype}(select(newtrain, input_vars))'
         newloss = loss(newinput, output)
-        if verbose print("Importance Score of ", string(feature), ": ", newloss / baseline, "\n") end
-        push!(scores, newloss/baseline)
+        if verbose
+            print(
+                "Importance Score of ",
+                string(feature),
+                ": ",
+                newloss / baseline,
+                "\n",
+            )
+        end
+        push!(scores, newloss / baseline)
     end
     #setoutscale!(model, temp);
     if ret
@@ -246,26 +278,57 @@ Calculate the feature importance metrics via a random shuffling of input feature
 - `ret::Bool`: indicates whether to return the scores as a vector. Default is true.
 - `verbose::Bool`: indicates whether to print the scores as they are generated. Default is false.
 """
-function feature_importance_series(data::DataFrame, input_vars::Vector{Symbol}, target::Symbol, model, loss; dtype = Float32, ret = true, verbose = false)
+function feature_importance_series(
+    data::DataFrame,
+    input_vars::Vector{Symbol},
+    target::Symbol,
+    model,
+    loss;
+    dtype = Float32,
+    ret = true,
+    verbose = false,
+)
     scores = zeros(length(input_vars))
     for site in unique(data[!, :id])
         sitedata = data[data[!, :id] .== site, :]
         true_out = sitedata[!, target]
-        pred_zs_base, _, _ = make_timeseries(model, sitedata, target, :date, input_vars, Second(86400))
+        pred_zs_base, _, _ = make_timeseries(
+            model,
+            sitedata,
+            target,
+            :date,
+            input_vars,
+            Second(86400),
+        )
         baseline = loss(pred_zs_base, true_out)
         for i in 1:length(input_vars)
             feature = input_vars[i]
             newdata = deepcopy(sitedata)
             shuffle_feature = Flux.Random.shuffle(newdata[!, feature])
             newdata[!, feature] .= shuffle_feature
-            pred_zs_new, _, _ = make_timeseries(model, newdata, target, :date, input_vars, Second(86400))
+            pred_zs_new, _, _ = make_timeseries(
+                model,
+                newdata,
+                target,
+                :date,
+                input_vars,
+                Second(86400),
+            )
             newloss = loss(pred_zs_new, true_out)
-            scores[i] += newloss/baseline
+            scores[i] += newloss / baseline
         end
     end
     scores /= length(unique(data[!, :id]))
     for i in 1:length(scores)
-        if verbose print("Importance Score of ", string(input_vars[i]), ": ", scores[i], "\n") end
+        if verbose
+            print(
+                "Importance Score of ",
+                string(input_vars[i]),
+                ": ",
+                scores[i],
+                "\n",
+            )
+        end
     end
     if ret
         return scores

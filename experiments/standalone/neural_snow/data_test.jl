@@ -10,23 +10,54 @@ using Dates
     station_id = 1030
     station_state = "CO"
     real_link = "https://wcc.sc.egov.usda.gov/reportGenerator/view_csv/customSingleStationReport/daily/start_of_period/1030:CO:SNTL/2015-01-01,2015-02-01/SNWD::value,"
-    @test data_url(station_id, station_state, ["SNWD"], start_date=start_date, end_date=end_date) == real_link
+    @test data_url(
+        station_id,
+        station_state,
+        ["SNWD"],
+        start_date = start_date,
+        end_date = end_date,
+    ) == real_link
 
-    test_data1 = get_data(station_id, station_state, ["SNWD"], start=start_date, finish=end_date)
+    test_data1 = get_data(
+        station_id,
+        station_state,
+        ["SNWD"],
+        start = start_date,
+        finish = end_date,
+    )
     @test typeof(test_data1) == DataFrame
     @test size(test_data1) == (32, 2)
     @test typeof(test_data1[1, 1]) == Date
     @test sum(test_data1[!, 2]) == 1168
 
-    test_data2 = sitedata_daily(station_id, station_state, start=start_date, finish=end_date)
+    test_data2 = sitedata_daily(
+        station_id,
+        station_state,
+        start = start_date,
+        finish = end_date,
+    )
     @test typeof(test_data2) === DataFrame
     @test size(test_data2) == (32, 8)
-    colnames = ["date", "SWE", "z", "precip", "rel_hum_avg", "sol_rad_avg", "wind_speed_avg", "air_temp_avg"]
+    colnames = [
+        "date",
+        "SWE",
+        "z",
+        "precip",
+        "rel_hum_avg",
+        "sol_rad_avg",
+        "wind_speed_avg",
+        "air_temp_avg",
+    ]
     @test DataFrames.names(test_data2) == colnames
     @test typeof(test_data2[1, 1]) == Date
     @test sum(test_data2[!, :z]) == 1168
 
-    test_data3 = sitedata_hourly(station_id, station_state, start=start_date, finish=end_date)
+    test_data3 = sitedata_hourly(
+        station_id,
+        station_state,
+        start = start_date,
+        finish = end_date,
+    )
     @test typeof(test_data3) === DataFrame
     @test size(test_data3) == (768, 8)
     @test DataFrames.names(test_data3) == colnames
@@ -34,9 +65,9 @@ using Dates
     @test sum(skipmissing(test_data3[!, :z])) == 25063
     @test sum(skipmissing(test_data3[!, :rel_hum_avg])) == 62232
 
-    test_bounds = Dict{Symbol,Tuple{Real,Real}}(
+    test_bounds = Dict{Symbol, Tuple{Real, Real}}(
         :z => (0, 37),
-        :rel_hum_avg => (84, 100)
+        :rel_hum_avg => (84, 100),
     )
     test_data4 = apply_bounds(test_data3, test_bounds)
     @test sum(skipmissing(test_data4[!, :z])) == 19007
@@ -52,7 +83,7 @@ using Dates
     @test sum(test_data6[!, :rel_hum_avg]) == 2593
     inch2meter = 0.0254
     kmphr2mps = 5.0 / 18.0
-    scales = Dict{Symbol,Real}(
+    scales = Dict{Symbol, Real}(
         :SWE => inch2meter,
         :z => inch2meter,
         :precip => inch2meter,
@@ -75,8 +106,10 @@ using Dates
     @test minimum(test_data9[!, :z]) ≈ 0.8636 atol = 1e-4
 
     test_data8[!, :id] .= station_id
-    test_data10 = prep_data(test_data8, extract_vars=[:dprecipdt_rain, :dprecipdt_snow])
-    x_train, y_train = make_data(test_data10, [:dprecipdt_rain], :dprecipdt_snow, 1.0)
+    test_data10 =
+        prep_data(test_data8, extract_vars = [:dprecipdt_rain, :dprecipdt_snow])
+    x_train, y_train =
+        make_data(test_data10, [:dprecipdt_rain], :dprecipdt_snow, 1.0)
     @test test_data10[!, 1] .+ test_data10[!, 2] == test_data8[!, :dprecipdt]
     @test size(x_train) == (1, 31)
     @test size(y_train) == (1, 31)
@@ -86,7 +119,15 @@ end
 @testset "Testing Model Utilities" begin
     nfeatures = 7
     n = 5
-    pred_vars = [:z, :SWE, :rel_hum_avg, :sol_rad_avg, :wind_speed_avg, :air_temp_avg, :dprecipdt_snow]
+    pred_vars = [
+        :z,
+        :SWE,
+        :rel_hum_avg,
+        :sol_rad_avg,
+        :wind_speed_avg,
+        :air_temp_avg,
+        :dprecipdt_snow,
+    ]
     z_idx = 1
     p_idx = 7
     model = make_model(nfeatures, n, z_idx, p_idx)
@@ -129,7 +170,7 @@ end
     @test test_loss_check(input_x, input_y) == 11.8
 
     data = CSV.read("cleandata.csv", DataFrame)
-    data = data[data[!, :id].==1286, :]
+    data = data[data[!, :id] .== 1286, :]
     data = prep_data(data)
     nmodel = make_model(nfeatures, n, z_idx, p_idx)
     Flux.loadmodel!(nmodel, BSON.load("ref_model.bson")[:model_state])
@@ -137,8 +178,10 @@ end
     pred_series, _, _ = make_timeseries(nmodel, data, Day(1))
     true_series = data[!, :z]
     test_loss(x, y) = custom_loss(x, y, nmodel, 2, 1)
-    series_err = sqrt(sum((pred_series .- true_series) .^ 2) ./ length(pred_series))
-    direct_err = test_loss(Matrix{Float32}(select(data, pred_vars))', data[!, :dzdt]')
+    series_err =
+        sqrt(sum((pred_series .- true_series) .^ 2) ./ length(pred_series))
+    direct_err =
+        test_loss(Matrix{Float32}(select(data, pred_vars))', data[!, :dzdt]')
     @test series_err ≈ 0.1 atol = 0.05
     @test direct_err ≈ 0 atol = 1e-12
 
@@ -148,16 +191,26 @@ end
     settimescale!(nmodel, 86400 * out_scale)
     setoutscale!(nmodel, 1.0)
     callback_check = [0.0]
-    function call_check(val=callback_check)
+    function call_check(val = callback_check)
         val[1] += 1
     end
     nepochs = 10
-    trainmodel!(nmodel, ps, x_train, y_train, 2, 1, nepochs=nepochs, cb=call_check)
+    trainmodel!(
+        nmodel,
+        ps,
+        x_train,
+        y_train,
+        2,
+        1,
+        nepochs = nepochs,
+        cb = call_check,
+    )
     @test callback_check[1] == nepochs
     setoutscale!(nmodel, out_scale)
     settimescale!(nmodel, 86400)
     pred_series, _, _ = make_timeseries(nmodel, data, Day(1))
-    series_err = sqrt(sum((pred_series .- true_series) .^ 2) ./ length(pred_series))
+    series_err =
+        sqrt(sum((pred_series .- true_series) .^ 2) ./ length(pred_series))
     @test series_err <= 0.2
     #only data/model tools get tested and moved to src, the rest become tutorials (not experiment)
 end
