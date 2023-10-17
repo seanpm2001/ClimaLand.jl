@@ -6,27 +6,34 @@ include("display_tools.jl")
 using DataFrames, CSV, Dates
 
 print("\nRunning Evaluation!\n")
-const nbatch = 64
 const nepochs = 100
 n = 5
 n1 = 1
 n2 = 1
 
-pred_vars = [:z, :SWE, :rel_hum_avg, :sol_rad_avg, :wind_speed_avg, :air_temp_avg, :dprecipdt_snow]
+pred_vars = [
+    :z,
+    :SWE,
+    :rel_hum_avg,
+    :sol_rad_avg,
+    :wind_speed_avg,
+    :air_temp_avg,
+    :dprecipdt_snow,
+]
 target = :dzdt
 z_idx = 1
 p_idx = 7
 Δt = Second(86400)
 const nfeatures = length(pred_vars)
 
-data_filename = "cleancode/cleandata.csv"
+data_filename = "cleandata.csv"
 data = CSV.read(data_filename, DataFrame)
 usedata = prep_data(data)
 out_scale = maximum(abs.(usedata[!, target]))
 in_scales = std.(eachcol(select(usedata, pred_vars)))
 x_train, y_train = make_data(usedata, pred_vars, target, out_scale)
 
-model = make_model(nfeatures, n, z_idx, p_idx, in_scale=in_scales)
+model = make_model(nfeatures, n, z_idx, p_idx, in_scale = in_scales)
 ps = get_model_ps(model)
 
 #training loop:
@@ -45,5 +52,10 @@ for site in unique(data[!, :id])
     pred_series, _, _ = make_timeseries(model, sitedata, Δt)
     print("\nSITE: ", site)
     display_scores(pred_series, true_series, timeseries = true)
-    siteplot(sitedata[!, :date], pred_series, true_series, "SITE: "*string(site))
+    siteplot(
+        sitedata[!, :date],
+        pred_series,
+        true_series,
+        "SITE: " * string(site),
+    )
 end

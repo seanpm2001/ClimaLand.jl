@@ -9,24 +9,32 @@ function desc(input)
 end
 
 function siteplot(data, id)
-    vars = ["SWE", "z", "rel_hum_avg", "sol_rad_avg", "wind_speed_avg", "air_temp_avg", "dprecipdt"]
+    vars = [
+        "SWE",
+        "z",
+        "rel_hum_avg",
+        "sol_rad_avg",
+        "wind_speed_avg",
+        "air_temp_avg",
+        "dprecipdt",
+    ]
     for var in vars
-        t = string(id)*": "*var
+        t = string(id) * ": " * var
         display(plot(data[!, :date], data[!, Symbol(var)], title = t))
     end
 end
 
 const inch2meter = 0.0254
-const kmphr2mps = 5.0/18.0
+const kmphr2mps = 5.0 / 18.0
 
-filter_val = Dict{Symbol,Tuple{Real,Real}}(
+filter_val = Dict{Symbol, Tuple{Real, Real}}(
     :SWE => (0.0, 250.0),
     :z => (0.0, 420.0),
     :precip => (0.0, 250.0),
     :rel_hum_avg => (10.0, 100.0),
     :sol_rad_avg => (0.0, 1500.0),
     :wind_speed_avg => (0.0, 216.0),
-    :air_temp_avg => (-55.0, 60.0)
+    :air_temp_avg => (-55.0, 60.0),
 )
 
 scales = Dict{Symbol, Real}(
@@ -80,22 +88,44 @@ good_stations = Dict{Int, Tuple{String, String}}(
 )
 
 station_metadata_site = "https://wcc.sc.egov.usda.gov/reportGenerator/view_csv/customMultipleStationReport,metric/daily/start_of_period/network=%22SNTL%22%7Cname/0,0/stationId,state.code,elevation,latitude,longitude"
-metadata = CSV.read(HTTP.get(station_metadata_site).body, DataFrame, comment="#", delim=",")
+metadata = CSV.read(
+    HTTP.get(station_metadata_site).body,
+    DataFrame,
+    comment = "#",
+    delim = ",",
+)
 metacols = ["id", "state", "elev", "lat", "lon"]
 DataFrames.rename!(metadata, Symbol.(metacols))
 
 allsites = Any[]
 for site in sort(collect(keys(good_stations)))
-    state = metadata[metadata[!, :id].==site, :state][1]
+    state = metadata[metadata[!, :id] .== site, :state][1]
     start_date = good_stations[site][1]
     end_date = good_stations[site][2]
-    print("\nSITE: ", site, " (", state, ") | FROM ", start_date, " TO ", end_date, "\n")
-    daily = apply_bounds(sitedata_daily(site, state, start = start_date, finish = end_date), filter_val)
-    hourly = apply_bounds(sitedata_hourly(site, state, start = start_date, finish = end_date), filter_val)
+    print(
+        "\nSITE: ",
+        site,
+        " (",
+        state,
+        ") | FROM ",
+        start_date,
+        " TO ",
+        end_date,
+        "\n",
+    )
+    daily = apply_bounds(
+        sitedata_daily(site, state, start = start_date, finish = end_date),
+        filter_val,
+    )
+    hourly = apply_bounds(
+        sitedata_hourly(site, state, start = start_date, finish = end_date),
+        filter_val,
+    )
     hourly_d = hourly2daily(hourly)
-    daily = scale_cols(rectify_daily_hourly(daily, hourly_d), scales)
+    gap_daily = rectify_daily_hourly(daily, hourly_d)
+    daily_scaled = scale_cols(gap_daily, scales)
     #daily = scale_cols(hourly, scales)
-    daily_clean = daily[completecases(daily), :]
+    daily_clean = daily_scaled[completecases(daily_scaled), :]
     daily_clean = makediffs(daily_clean, Day(1))
     #daily_clean = makediffs(daily_clean, Hour(1))
     good_vals = daily_clean[!, :dprecipdt] .>= 0.0
@@ -106,9 +136,9 @@ for site in sort(collect(keys(good_stations)))
     print("\nSIZE: ", nrow(daily_clean), "\n")
 
     daily_clean[!, :id] .= site
-    daily_clean[!, :elev] .= metadata[metadata[!, :id].==site, :elev][1]
-    daily_clean[!, :lat] .= metadata[metadata[!, :id].==site, :lat][1]
-    daily_clean[!, :lon] .= metadata[metadata[!, :id].==site, :lon][1]
+    daily_clean[!, :elev] .= metadata[metadata[!, :id] .== site, :elev][1]
+    daily_clean[!, :lat] .= metadata[metadata[!, :id] .== site, :lat][1]
+    daily_clean[!, :lon] .= metadata[metadata[!, :id] .== site, :lon][1]
 
     push!(allsites, daily_clean)
 end

@@ -5,6 +5,7 @@ version = "0.3.3"
 
 [deps]
 ArtifactWrappers = "a14bc488-3040-4b00-9dc1-f6467924858a"
+BSON = "fbb218c0-5317-5bc6-957e-2ee96dd4b1f0"
 CFTime = "179af706-886a-5703-950a-314cd64e0468"
 ClimaComms = "3a4d1b5c-c61d-41fd-a00a-5873ba7a1b0d"
 ClimaCore = "d414da3d-4745-48bb-8d80-42e94e092884"

@@ -21,33 +21,6 @@ function show_mem_usage(ret::Bool = false)
 end
 
 """
-    make_data(data, input_vars, target, target_scale; testidx, dtype)
-
-Create training and testing matrices for the models from prepped input data.
-
-# Arguments
-- `data::DataFrame`: the data to be used for training and validation data.
-- `input_vars::Vector{Symbol}`: The set of features to be extracted as input data
-- `target::Symbol`: The feature to be extracted as the target variable
-- `target_scale::Real`: The scaling to apply to the output data
-- `testidx': the set of indices to use as test/validation data, or "nothing". Default is "nothing"
-- `dtype::Type`: The data type consistent with the model. Default is Float32.
-"""
-function make_data(data::DataFrame, input_vars::Vector{Symbol}, target::Symbol, target_scale::Real; testidx=nothing, dtype::Type=Float32)
-    vardata = select(data, cat(dims=1, input_vars, target))
-    traindata = (isnothing(testidx)) ? vardata : vardata[(!).(testidx), :]
-    x_train = Matrix{dtype}(traindata[!, Not(target)])'
-    y_train = Vector{dtype}(traindata[!, target])' ./ dtype(target_scale)
-    if isnothing(testidx)
-        return x_train, y_train
-    end
-    testdata = vardata[testidx, :]
-    x_test = Matrix{dtype}(testdata[!, Not(target)])'
-    y_test = Vector{dtype}(testdata[!, target])' ./ dtype(target_scale)
-    return x_train, y_train, x_test, y_test
-end
-
-"""
     nash_sutcliffe(pred, truth)
 
 Calculate the Nash-Sutcliffe efficiency (NSE) between a predicted and true timeseries.
@@ -297,55 +270,4 @@ function feature_importance_series(data::DataFrame, input_vars::Vector{Symbol}, 
     if ret
         return scores
     end
-end
-
-"""
-    custom_loss(x, y, model, n1, n2)
-
-Creates a loss function to be used during training specified by two hyperparameters n1, n2, as outlined in the paper.
-
-# Arguments
-- `x`: the input values.
-- `y`: output values to compare to.
-- `model`: the model over which to evaluate the loss function.
-- `n1::Int`: the hyperparameter dictating the scaling of mismatch error.
-- `n2::Int`: the hyperparameter dictating the weighting of a given mismatch error by the target magnitude.
-"""
-function custom_loss(x, y, model, n1, n2)
-    sum(abs.(model(x) - y) .^ n1 .* (1.0 .+ abs.(y) .^ n2)) ./ length(y)
-end
-
-"""
-    trainmodel!(model, ps, x_train, y_train, n1, n2; nepochs, opt, verbose, cb)
-
-A training function for a neural model, permitting usage of a callback function.
-
-# Arguments
-- `model`: the model used for training.
-- `ps`: the model parameters that will be trained.
-- `x_train`: the input training data to be used in training.
-- `y_train`: the target data to be used in training.
-- `n1`: the scaling hypermarameter used to generate custom loss functions.
-- `n2`: the weighting hyperparameter used to generate custom loss functions.
-- `nepochs::Int`: the number of epochs. Default is 100.
-- `opt`: the Flux optimizer to be used. Default is RMSProp()
-- `verbose::Bool`: indicates whether to print the training loss every 10 epochs
-- `cb`: Allows utlization of a callback function (must take no input arguments)
-"""
-function trainmodel!(model, ps, x_train, y_train, n1, n2;
-    nepochs::Int = 100,
-    opt = Flux.Optimise.RMSProp(),
-    verbose = false,
-    cb = Nothing)
-    train_loader = DataLoader((x_train, y_train), batchsize=nbatch, partial=false, shuffle=true)
-    loss(x, y) = custom_loss(x, y, model, n1, n2)
-    for epoch in 1:nepochs
-        for (x, y) in train_loader
-            Flux.train!(loss, ps, [(x, y)], opt)
-        end
-        if verbose & (epoch%10 == 0)
-            print("Epoch: ", epoch, " | training loss: ", loss(x_train, y_train), "\n")
-        end
-        cb()
-    end    
 end
