@@ -159,7 +159,7 @@ An =
         Rd,
     )
 
-GPP = @. ClimaLSM.Canopy.compute_GPP(An, K, LAI, Ω)
+GPP_model = @. ClimaLSM.Canopy.compute_GPP(An, K, LAI, Ω)
 gs = @. ClimaLSM.Canopy.medlyn_conductance(g0, Drel, medlyn_factor, An, c_co2_air)
 g_canopy = @. ClimaLSM.Canopy.upscale_leaf_conductance(gs, LAI, T_air, R, P_air)
 r_canopy = 1 ./ g_canopy
