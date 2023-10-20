@@ -220,6 +220,17 @@ Plots.plot!(plot_G, 0.5:0.5:24, diurnal_avg(G[steps[1:idx_end]], 48), label = "D
 Plots.plot(plt_scatter, plot_G, layout =(1,2))
 savefig("CLM_fluxes_G.png")
 
+# GPP
+plt_scatter = Plots.scatter(GPP_model[steps[1:idx_end]], GPP[steps[1:idx_end]], xlabel = "Model", ylabel = "Data", title= "GPP")
+(intercept, slope) = CurveFit.linear_fit(GPP_model[steps[1:idx_end]], GPP[steps[1:idx_end]])
+x = Array(minimum(GPP_model[steps[1:idx_end]]):1e-6:maximum(GPP_model[steps[1:idx_end]]))
+y = x .* slope .+intercept
+Plots.plot!(plt_scatter, x, y, label = "Fit; slope = $slope")
+
+plot_GPP = Plots.plot(0.5:0.5:24, diurnal_avg(GPP_model[steps[1:idx_end]], 48), label = "Model", title = "GPP", xlabel = "Hour of day")
+Plots.plot!(plot_GPP, 0.5:0.5:24, diurnal_avg(GPP[steps[1:idx_end]], 48), label = "Data")
+Plots.plot(plt_scatter, plot_GPP, layout =(1,2))
+savefig("CLM_fluxes_GPP.png")
 
 # Looks wrong all around
 plt_scatter = Plots.scatter(shf, H[steps[1:idx_end]], xlabel = "Model", ylabel = "Data", title= "SHF")
@@ -241,6 +252,10 @@ plt_temp = Plots.plot( 0.5:0.5:24, diurnal_avg(T_airspace_model, 48), label = "A
 Plots.plot!(plt_temp,  0.5:0.5:24, diurnal_avg(T_air[steps[1:idx_end]], 48), label = "Atmos")
 Plots.plot!(plt_temp,  0.5:0.5:24, diurnal_avg(T_soil[steps[1:idx_end]], 48), label = "Soil")
 Plots.plot!(plt_temp,  0.5:0.5:24, diurnal_avg(T_canopy_model, 48), label = "Canopy")
+T_surface = @. (LW_out_model / 5.67e-8)^0.25
+Plots.plot!(plt_temp,  0.5:0.5:24, diurnal_avg(T_surface, 48), label = "Surface (Model)")
+T_surface_data = @. (LW_OUT / 5.67e-8)^0.25
+Plots.plot!(plt_temp,  0.5:0.5:24, diurnal_avg(T_surface_data[steps[1:idx_end]], 48), label = "Surface (Data)")
 savefig("CLM_temperatures.png")
 
 # same spikes
