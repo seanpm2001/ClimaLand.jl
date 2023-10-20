@@ -20,14 +20,14 @@ Cs_canopy = 0.004 # CLM 2.5.120
 # Define the functions that compute the surface fluxes.
 function atmos_airspace_fluxes(ts_sfc, ts_in, atmos_h, d_sfc, u_air,z_0m, z_0b, surface_flux_params,cp_m)
     state_sfc =
-        SurfaceFluxes.SurfaceValues(FT(0), SVector{2, FT}(0, 0), ts_sfc)
+        SurfaceFluxes.StateValues(FT(0), SVector{2, FT}(0, 0), ts_sfc)
     state_in =
-        SurfaceFluxes.InteriorValues(atmos_h - d_sfc, SVector{2, FT}(u_air, 0), ts_in)
-        sc = SurfaceFluxes.ValuesOnly{FT}(;
+        SurfaceFluxes.StateValues(atmos_h - d_sfc, SVector{2, FT}(u_air, 0), ts_in)
+        sc = SurfaceFluxes.ValuesOnly(
                                           state_in,
                                           state_sfc,
-                                          z0m = z_0m,
-                                          z0b = z_0b,
+                                          z_0m,
+                                          z_0b,
                                           )
         
         # Canopy airspace at z0+d and atmos at h
@@ -84,21 +84,20 @@ end
 
 function atmos_sfc_fluxes(ts_sfc, ts_in, atmos_h, d_sfc, u_air,z_0m, z_0b, surface_flux_params, thermo_params, r_sfc, cp_m)
     state_sfc =
-        SurfaceFluxes.SurfaceValues(FT(0), SVector{2, FT}(0, 0), ts_sfc)
+        SurfaceFluxes.StateValues(FT(0), SVector{2, FT}(0, 0), ts_sfc)
     state_in =
-        SurfaceFluxes.InteriorValues(atmos_h - d_sfc, SVector{2, FT}(u_air, 0), ts_in)
-    sc = SurfaceFluxes.ValuesOnly{FT}(;
+        SurfaceFluxes.StateValues(atmos_h - d_sfc, SVector{2, FT}(u_air, 0), ts_in)
+    sc = SurfaceFluxes.ValuesOnly(
                                       state_in,
                                       state_sfc,
-                                      z0m = z_0m,
-                                      z0b = z_0b,
+                                      z_0m,
+                                      z_0b,
                                       )
     
     # Surface at z0+d and atmos at h
     conditions = SurfaceFluxes.surface_conditions(
         surface_flux_params,
         sc;
-        tol_neutral = SFP.cp_d(surface_flux_params) / 10000,
     )
     T_sfc = Thermodynamics.air_temperature(thermo_params, ts_sfc)
     T_in = Thermodynamics.air_temperature(thermo_params, ts_in)

@@ -59,7 +59,7 @@ converged = []
 # step through the data and compute surface fluxes according to the model
 steps = 120*48:1:180*48
 # Errors on near step 7613
-for step in 120*48:1:7612
+for step in 120*48:1:5911#7612
     @info(step)
     # Tairspace, qairspace, Tcanopy, ustar, shf, lhf, LMO. Only the first three are optimized, so we set F[4:7] = 0.
     initial_guess = [0.5 .*(T_air[step] .+ T_soil[step]), 0.5 .*(q_air[step] .+ q_soil[step]), 0.5 .*(T_air[step] .+ T_soil[step]), u_air[step], 0.0, 0.0, 0.0]
