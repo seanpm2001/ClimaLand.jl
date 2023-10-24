@@ -1,6 +1,8 @@
+module ModelTools
 using Flux, LinearAlgebra
 using Flux.Data: DataLoader
 using DataFrames, Dates
+export make_model, get_model_ps, settimescale!, setoutscale!, LRmodel, make_timeseries, trainmodel!
 
 """
     make_model(nfeatures, n, z_idx, p_idx; in_scale, dtype)
@@ -57,6 +59,8 @@ function make_model(
     )
     return model
 end
+# Do we want to modify this to take a list of input features, and the names of the depth and precipitation variables,
+# instead of specifying nfeatures, z_idx, p_idx? Same functionality but simplifies the usage pipeline.
 
 
 """
@@ -151,7 +155,7 @@ function LRmodel(
 end
 
 """
-    eval(model, input)
+    evaluate(model, input)
 
 Evaluate a created model on a given input vector.
 
@@ -159,12 +163,12 @@ Evaluate a created model on a given input vector.
 - `model::Chain`: A neural model to be used for prediction.
 - `input`: The input data used to generate a prediction.
 """
-function eval(model::Chain, input)
+function evaluate(model::Chain, input)
     return model(input)
 end
 
 """
-    eval(model, input)
+    evaluate(model, input)
 
 Evaluate a created model on a given input vector.
 
@@ -172,7 +176,7 @@ Evaluate a created model on a given input vector.
 - `model::Vector{<:Real}`: Linear regression coefficients used for prediction.
 - `input`: The input data used to generate a prediction.
 """
-function eval(model::Vector{<:Real}, input)
+function evaluate(model::Vector{<:Real}, input)
     #requires input matrix to be the same orientation as that for the neural model
     return model[1:(end - 1)]' * input .+ model[end]
 end
@@ -184,7 +188,7 @@ end
 Generate a predicted timeseries given forcing data and the timestep present in that data (holes acceptable).
 
 # Arguments
-- `model`: The model used for forecasting (can be any model with a defined "eval" call).
+- `model`: The model used for forecasting (can be any model with a defined "evaluate" call).
 - `timeseries::DataFrame`: The input data frame used to generate predictions, including a time variable.
 - `dt::Period`: The unit timestep present in the dataframe (i.e. daily dataframe, dt = Day(1) or Second(86400)).
 - `predictvar::Symbol`: The variable to predict from the timeseries. Default is :z.
@@ -223,7 +227,7 @@ function make_timeseries(
     for j in 2:length(pred_series)
         input = forcings[j - 1, :]
         input[pred_idx] = pred_series[j - 1]
-        pred = eval(model, input)[1]
+        pred = evaluate(model, input)[1]
         pred_vals[j - 1] = pred
         nperiods = check_dates[j - 1]
         new_val = pred_series[j - 1] + nperiods * Dates.value(Second(dt)) * pred
@@ -271,7 +275,8 @@ A training function for a neural model, permitting usage of a callback function.
 - `nbatch::Int`: The number of data points to be used per batch. Default is 64.
 - `opt`: the Flux optimizer to be used. Default is RMSProp()
 - `verbose::Bool`: indicates whether to print the training loss every 10 epochs
-- `cb`: Allows utlization of a callback function (must take no input arguments)
+- `cb`: Allows utlization of a callback function (must take no required
+input arguments, but default optional args are permitted). Default is Nothing.
 """
 function trainmodel!(
     model,
@@ -308,4 +313,5 @@ function trainmodel!(
         end
         cb()
     end
+end
 end

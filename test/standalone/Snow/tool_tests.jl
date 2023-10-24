@@ -1,8 +1,8 @@
-include("data_tools.jl")
-include("model_tools.jl")
+using ClimaLSM.Snow.DataTools
+using ClimaLSM.Snow.ModelTools
 using Test
-using BSON
-using Dates
+using BSON, Dates, HTTP
+using DataFrames, CSV, StatsBase, Flux, LinearAlgebra
 
 @testset "Testing Data Utilities" begin
     start_date = "2015-01-01"
@@ -10,7 +10,7 @@ using Dates
     station_id = 1030
     station_state = "CO"
     real_link = "https://wcc.sc.egov.usda.gov/reportGenerator/view_csv/customSingleStationReport/daily/start_of_period/1030:CO:SNTL/2015-01-01,2015-02-01/SNWD::value,"
-    @test data_url(
+    @test DataTools.data_url(
         station_id,
         station_state,
         ["SNWD"],
@@ -18,7 +18,7 @@ using Dates
         end_date = end_date,
     ) == real_link
 
-    test_data1 = get_data(
+    test_data1 = DataTools.get_data(
         station_id,
         station_state,
         ["SNWD"],
@@ -51,6 +51,10 @@ using Dates
     @test DataFrames.names(test_data2) == colnames
     @test typeof(test_data2[1, 1]) == Date
     @test sum(test_data2[!, :z]) == 1168
+
+    download_link = "https://caltech.box.com/shared/static/4tih9hiydrc7bcvrpkr2x727b5l54oiq.csv"
+    download_data = CSV.read(HTTP.get(download_link).body, DataFrame)
+    @test isequal(download_data, test_data2)
 
     test_data3 = sitedata_hourly(
         station_id,
@@ -113,7 +117,6 @@ using Dates
     @test test_data10[!, 1] .+ test_data10[!, 2] == test_data8[!, :dprecipdt]
     @test size(x_train) == (1, 31)
     @test size(y_train) == (1, 31)
-    #save the data locally in case someone changes a number, and do another test that online_data = download_data
 end
 
 @testset "Testing Model Utilities" begin
@@ -143,11 +146,11 @@ end
     @test model[:final_scale].weight[3, 3] == 0.5
     @test model(test_input)[1] == 984
     setoutscale!(model, 2.0)
-    @test model(test_input)[1] == 1968 #test clipping
+    @test model(test_input)[1] == 1968 #this tests clipping
     @test model(-test_input)[1] == 0.0
     settimescale!(model, 1968)
     @test model[:final_scale].weight[2, 2] == Float32(1 / 1968)
-    @test eval(model, Vector{Float32}(ones(nfeatures)))[1] == 1968
+    @test ModelTools.evaluate(model, Vector{Float32}(ones(nfeatures)))[1] == 1968
 
     test_constants = [1.0, 2.0, 3.0, 4.0, 5.0]
     x = zeros(6, 5)
@@ -161,23 +164,26 @@ end
     model3 = LRmodel(x, y)
     @test model2 == answer
     @test model3 == answer
-    @test eval(model2, Vector{Float32}(ones(5)))[1] == 15
+    @test ModelTools.evaluate(model2, Vector{Float32}(ones(5)))[1] == 15
 
     temp(x) = x
-    test_loss_check(x, y) = custom_loss(x, y, temp, 2, 1)
+    test_loss_check(x, y) = ModelTools.custom_loss(x, y, temp, 2, 1)
     input_x = [1, 2, 3, 4, 5]
     input_y = [2, 3, 5, 2, 3]
     @test test_loss_check(input_x, input_y) == 11.8
 
-    data = CSV.read("cleandata.csv", DataFrame)
+    data_download_link = "https://caltech.box.com/shared/static/n59m3iqcgr60gllp65rsrd3k0mtnsfmg.csv"
+    model_download_link = "https://caltech.box.com/shared/static/bbu12b518i49aj3pl6b8t9t05twl5teq.bson"
+    data = CSV.read(HTTP.get(data_download_link).body, DataFrame)
     data = data[data[!, :id] .== 1286, :]
     data = prep_data(data)
     nmodel = make_model(nfeatures, n, z_idx, p_idx)
-    Flux.loadmodel!(nmodel, BSON.load("ref_model.bson")[:model_state])
+    model_state = BSON.load(IOBuffer(HTTP.get(model_download_link).body))[:model_state]
+    Flux.loadmodel!(nmodel, model_state)
     settimescale!(model, 86400.0)
     pred_series, _, _ = make_timeseries(nmodel, data, Day(1))
     true_series = data[!, :z]
-    test_loss(x, y) = custom_loss(x, y, nmodel, 2, 1)
+    test_loss(x, y) = ModelTools.custom_loss(x, y, nmodel, 2, 1)
     series_err =
         sqrt(sum((pred_series .- true_series) .^ 2) ./ length(pred_series))
     direct_err =
@@ -212,8 +218,6 @@ end
     series_err =
         sqrt(sum((pred_series .- true_series) .^ 2) ./ length(pred_series))
     @test series_err <= 0.2
-    #only data/model tools get tested and moved to src, the rest become tutorials (not experiment)
 end
-#line to run for formatting
-#From ClimaLSM.jl:
-#julia --project .dev/climaformat.jl .
+
+#add this script to the run_tests file

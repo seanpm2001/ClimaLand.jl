@@ -20,3 +20,11 @@ ClimaLSM.Snow.snow_bulk_temperature
 ClimaLSM.Snow.snow_liquid_mass_fraction
 ClimaLSM.Snow.maximum_liquid_mass_fraction
 ClimaLSM.Snow.runoff_timescale
+```
+
+## Tools for AI-Enabled Snow Forecasting
+
+```@docs
+ClimaLSM.Snow.DataTools
+ClimaLSM.Snow.ModelTools
+```

@@ -1,7 +1,7 @@
 using Plots
 
 """
-    siteplot(dates, pred, truth, title; LR)
+    siteplot(dates, pred, truth, title; LR, savename, display_plot)
 
 Wrapper function for generating pre-formtted plot of predicted vs actual seasonal snow timeseries.
 
@@ -11,6 +11,8 @@ Wrapper function for generating pre-formtted plot of predicted vs actual seasona
 - `truth::Vector{<:Real}`: the true values of the timeseries.
 - `title`::String`: The title to provide to the plot
 - `LR::Vector{<:Real}`: optional specification for inclusion of linear regression predictions as well.
+- `savefile::String`: the filename used to save the figure if saving is desired. Default is nothing (resulting in no figure saved)
+- `display_plot::Bool`: boolean indicating whether to display the plot at the end. Default is false.
 """
 function siteplot(
     dates,
@@ -18,6 +20,8 @@ function siteplot(
     truth::Vector{<:Real},
     title::String = "test";
     LR::Union{Nothing, Vector{<:Real}} = nothing,
+    savename = nothing,
+    display_plot = false
 )
     plot(
         dates,
@@ -31,7 +35,13 @@ function siteplot(
     if !isnothing(LR)
         plot!(dates, LR, label = "Linear Model", color = :green)
     end
-    display(plot!(dates, truth, label = "Raw Data", color = :blue))
+    out = plot!(dates, truth, label = "Raw Data", color = :blue)
+    if display_plot
+        display(out)
+    end
+    if !isnothing(savename)
+        savefig(out, savename);
+    end
 end
 
 """

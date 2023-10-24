@@ -23,6 +23,8 @@ tutorials = [
         ],
         "Bucket LSM" =>
             ["Bucket/bucket_tutorial.jl", "Bucket/coupled_bucket.jl"],
+        "Snow Modeling" =>
+            ["Snow/base_tutorial.jl", "Snow/data_tutorial.jl"],
     ],
 ]
 @everywhere const clima_dir = dirname(dirname(pathof(ClimaLSM)));

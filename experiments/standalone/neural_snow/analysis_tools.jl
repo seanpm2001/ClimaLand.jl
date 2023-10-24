@@ -200,15 +200,15 @@ function display_scores(
     timeseries = false,
 )
     print("\n******** SCORES: *******\n")
-    print("MAE:          ", l1(pred, truth), "\n")
-    print("RMSE:         ", rmse(pred, truth), "\n")
-    print("bias:         ", bias(pred, truth), "\n")
-    print("std_resid:    ", std_resid(pred, truth), "\n")
-    print("trend [m, b]: ", trendslope(pred, truth), "\n")
-    print("median % err: ", med_percent_err(pred, truth), "\n")
+    print("MAE:          ", round(l1(pred, truth), digits = 4), "\n")
+    print("RMSE:         ", round(rmse(pred, truth), digits = 4), "\n")
+    print("bias:         ", round(bias(pred, truth), digits = 4), "\n")
+    print("std_resid:    ", round(std_resid(pred, truth), digits = 4), "\n")
+    print("trend [m, b]: ", round.(trendslope(pred, truth), digits = 4), "\n")
+    print("median % err: ", round(100*med_percent_err(pred, truth), digits = 2), "%\n")
     if timeseries
-        print("NSE:          ", nashsutcliffe(pred, truth), "\n")
-        print("pack % err:   ", pack_percent_err(pred, truth), "\n")
+        print("NSE:          ", round(nashsutcliffe(pred, truth), digits = 4), "\n")
+        print("pack % err:   ", round(100*pack_percent_err(pred, truth), digits = 2), "%\n")
     end
 end
 
