@@ -150,7 +150,8 @@ end
     @test model(-test_input)[1] == 0.0
     settimescale!(model, 1968)
     @test model[:final_scale].weight[2, 2] == Float32(1 / 1968)
-    @test ModelTools.evaluate(model, Vector{Float32}(ones(nfeatures)))[1] == 1968
+    @test ModelTools.evaluate(model, Vector{Float32}(ones(nfeatures)))[1] ==
+          1968
 
     test_constants = [1.0, 2.0, 3.0, 4.0, 5.0]
     x = zeros(6, 5)
@@ -178,7 +179,8 @@ end
     data = data[data[!, :id] .== 1286, :]
     data = prep_data(data)
     nmodel = make_model(nfeatures, n, z_idx, p_idx)
-    model_state = BSON.load(IOBuffer(HTTP.get(model_download_link).body))[:model_state]
+    model_state =
+        BSON.load(IOBuffer(HTTP.get(model_download_link).body))[:model_state]
     Flux.loadmodel!(nmodel, model_state)
     settimescale!(model, 86400.0)
     pred_series, _, _ = make_timeseries(nmodel, data, Day(1))

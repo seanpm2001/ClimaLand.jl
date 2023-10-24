@@ -205,10 +205,22 @@ function display_scores(
     print("bias:         ", round(bias(pred, truth), digits = 4), "\n")
     print("std_resid:    ", round(std_resid(pred, truth), digits = 4), "\n")
     print("trend [m, b]: ", round.(trendslope(pred, truth), digits = 4), "\n")
-    print("median % err: ", round(100*med_percent_err(pred, truth), digits = 2), "%\n")
+    print(
+        "median % err: ",
+        round(100 * med_percent_err(pred, truth), digits = 2),
+        "%\n",
+    )
     if timeseries
-        print("NSE:          ", round(nashsutcliffe(pred, truth), digits = 4), "\n")
-        print("pack % err:   ", round(100*pack_percent_err(pred, truth), digits = 2), "%\n")
+        print(
+            "NSE:          ",
+            round(nashsutcliffe(pred, truth), digits = 4),
+            "\n",
+        )
+        print(
+            "pack % err:   ",
+            round(100 * pack_percent_err(pred, truth), digits = 2),
+            "%\n",
+        )
     end
 end
 

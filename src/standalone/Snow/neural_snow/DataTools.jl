@@ -1,6 +1,18 @@
 module DataTools
 using DataFrames, CSV, HTTP, Dates, StatsBase
-export sitedata_daily, sitedata_hourly, apply_bounds, hourly2daily, rectify_daily_hourly, scale_cols, makediffs, rolldata, snowsplit, filter_phys!, prep_data, make_data, snotel_metadata
+export sitedata_daily,
+    sitedata_hourly,
+    apply_bounds,
+    hourly2daily,
+    rectify_daily_hourly,
+    scale_cols,
+    makediffs,
+    rolldata,
+    snowsplit,
+    filter_phys!,
+    prep_data,
+    make_data,
+    snotel_metadata
 
 """
     data_url(id, state, fields; metric, hourly, start_date, end_date)
@@ -20,10 +32,10 @@ function data_url(
     id::Int,
     state::AbstractString,
     fields::Vector{String};
-    metric::Bool=false,
-    hourly::Bool=false,
-    start_date::String="start",
-    end_date::String="end"
+    metric::Bool = false,
+    hourly::Bool = false,
+    start_date::String = "start",
+    end_date::String = "end",
 )
     start = (start_date == "start") ? "1850-01-01" : start_date
     fin = (end_date == "end") ? "2023-06-01" : end_date
@@ -59,21 +71,21 @@ function get_data(
     id::Int,
     state::AbstractString,
     fields::Vector{String};
-    metric::Bool=false,
-    hourly::Bool=false,
-    start::String="start",
-    finish::String="end"
+    metric::Bool = false,
+    hourly::Bool = false,
+    start::String = "start",
+    finish::String = "end",
 )
     url = data_url(
         id,
         state,
         fields,
-        metric=metric,
-        hourly=hourly,
-        start_date=start,
-        end_date=finish,
+        metric = metric,
+        hourly = hourly,
+        start_date = start,
+        end_date = finish,
     )
-    data = CSV.read(HTTP.get(url).body, DataFrame, comment="#", delim=",")
+    data = CSV.read(HTTP.get(url).body, DataFrame, comment = "#", delim = ",")
     return data
 end
 
@@ -96,9 +108,9 @@ which is ["date", "SWE", "z", "precip", "rel_hum_avg", "sol_rad_avg", "wind_spee
 function sitedata_daily(
     id::Int,
     state::AbstractString;
-    imp_fields::Vector{String}=["WTEQ", "SNWD", "PREC"],
-    metric_fields::Vector{String}=["RHUMV", "SRADV", "WSPDV", "TAVG"],
-    colnames::Vector{String}=[
+    imp_fields::Vector{String} = ["WTEQ", "SNWD", "PREC"],
+    metric_fields::Vector{String} = ["RHUMV", "SRADV", "WSPDV", "TAVG"],
+    colnames::Vector{String} = [
         "date",
         "SWE",
         "z",
@@ -108,19 +120,19 @@ function sitedata_daily(
         "wind_speed_avg",
         "air_temp_avg",
     ],
-    start::String="start",
-    finish::String="end"
+    start::String = "start",
+    finish::String = "end",
 )
-    imp_data = get_data(id, state, imp_fields, start=start, finish=finish)
+    imp_data = get_data(id, state, imp_fields, start = start, finish = finish)
     metric_data = get_data(
         id,
         state,
         metric_fields,
-        metric=true,
-        start=start,
-        finish=finish,
+        metric = true,
+        start = start,
+        finish = finish,
     )
-    data = DataFrames.innerjoin(imp_data, metric_data, on=:Date)
+    data = DataFrames.innerjoin(imp_data, metric_data, on = :Date)
     DataFrames.rename!(data, Symbol.(colnames))
     return data
 end
@@ -144,9 +156,9 @@ which is ["date", "SWE", "z", "precip", "rel_hum_avg", "sol_rad_avg", "wind_spee
 function sitedata_hourly(
     id::Int,
     state::AbstractString;
-    imp_fields::Vector{String}=["WTEQ", "SNWD", "PREC"],
-    metric_fields::Vector{String}=["RHUMV", "SRADV", "WSPDV", "TOBS"],
-    colnames::Vector{String}=[
+    imp_fields::Vector{String} = ["WTEQ", "SNWD", "PREC"],
+    metric_fields::Vector{String} = ["RHUMV", "SRADV", "WSPDV", "TOBS"],
+    colnames::Vector{String} = [
         "date",
         "SWE",
         "z",
@@ -156,27 +168,27 @@ function sitedata_hourly(
         "wind_speed_avg",
         "air_temp_avg",
     ],
-    start::String="start",
-    finish::String="end"
+    start::String = "start",
+    finish::String = "end",
 )
     imp_data = get_data(
         id,
         state,
         imp_fields,
-        hourly=true,
-        start=start,
-        finish=finish,
+        hourly = true,
+        start = start,
+        finish = finish,
     )
     metric_data = get_data(
         id,
         state,
         metric_fields,
-        metric=true,
-        hourly=true,
-        start=start,
-        finish=finish,
+        metric = true,
+        hourly = true,
+        start = start,
+        finish = finish,
     )
-    data = DataFrames.innerjoin(imp_data, metric_data, on=:Date)
+    data = DataFrames.innerjoin(imp_data, metric_data, on = :Date)
     DataFrames.rename!(data, Symbol.(colnames))
     data[!, :date] .= DateTime.(data[!, :date], "yyyy-mm-dd HH:MM")
     return data
@@ -194,12 +206,12 @@ Values outside bounds are converted to 'missing'.
 - `bounds::Dict{Symbol, Tuple{Real, Real}}`: The dictionary specifying which columns to threshold, as
 well as the thresholds to apply via (min, max).
 """
-function apply_bounds(data::DataFrame, bounds::Dict{Symbol,Tuple{Real,Real}})
+function apply_bounds(data::DataFrame, bounds::Dict{Symbol, Tuple{Real, Real}})
     bounded = deepcopy(data)
     for colname in names(bounded)
         coltype = eltype(bounded[!, Symbol(colname)])
         bounded[!, Symbol(colname)] = convert(
-            Vector{Union{Missing,coltype}},
+            Vector{Union{Missing, coltype}},
             bounded[!, Symbol(colname)],
         )
     end
@@ -243,7 +255,7 @@ function hourly2daily(hourlydata::DataFrame)
         [:SWE, :z, :precip] .=> missingfirst,
         [:rel_hum_avg, :sol_rad_avg, :wind_speed_avg, :air_temp_avg] .=>
             missingmean,
-        renamecols=false,
+        renamecols = false,
     )
     return dailydata
 end
@@ -260,7 +272,7 @@ Use one SNOTEL data stream (hourly data) to fill holes in another SNOTEL data st
 """
 function rectify_daily_hourly(daily_data::DataFrame, hourly_data::DataFrame)
     vars = names(daily_data)
-    combined = outerjoin(daily_data, hourly_data, on=:date, makeunique=true)
+    combined = outerjoin(daily_data, hourly_data, on = :date, makeunique = true)
     for var in vars[2:end]
         combined[!, Symbol(var)] .=
             coalesce.(combined[!, Symbol(var)], combined[!, Symbol(var * "_1")])
@@ -278,7 +290,7 @@ Apply multiplicative scaling to select columns of a data frame.
 - `scales::Dict{Symbol, Real}`: The dictionary specifying which columns to scale, as
 well as the multitiplicative constant to apply to that column.
 """
-function scale_cols(data::DataFrame, scales::Dict{Symbol,Real})
+function scale_cols(data::DataFrame, scales::Dict{Symbol, Real})
     scaled = deepcopy(data)
     for key in keys(scales)
         scaled[!, key] .= scaled[!, key] .* scales[key]
@@ -302,13 +314,13 @@ Turns data fields which represent accumulated values of variables into a rate of
 function makediffs(
     data::DataFrame,
     Δt::Period;
-    diffvars::Vector{Symbol}=[:SWE, :z, :precip]
+    diffvars::Vector{Symbol} = [:SWE, :z, :precip],
 )
-    diffdata = deepcopy(data[1:(end-1), :])
-    dt = data[2:end, :date] .- data[1:(end-1), :date]
+    diffdata = deepcopy(data[1:(end - 1), :])
+    dt = data[2:end, :date] .- data[1:(end - 1), :date]
     good_t = (dt .== Δt)
     for var in diffvars
-        dvar = data[2:end, var] .- data[1:(end-1), var]
+        dvar = data[2:end, var] .- data[1:(end - 1), var]
         diffdata[!, Symbol("d" * string(var) * "dt")] =
             dvar ./ Dates.value.(Second.(dt))
     end
@@ -346,9 +358,9 @@ function rolldata(
     data,
     Δt::Period,
     N::Int;
-    takefirst::Vector{Symbol}=[:date, :SWE, :z, :precip]
+    takefirst::Vector{Symbol} = [:date, :SWE, :z, :precip],
 )
-    dt = (data[N:end, :date] .- data[1:(end-N+1), :date]) ./ Δt
+    dt = (data[N:end, :date] .- data[1:(end - N + 1), :date]) ./ Δt
     rolleddata = Any[]
     for i in 1:length(dt)
         if dt[i] <= N - 1
@@ -357,7 +369,7 @@ function rolldata(
                 if Symbol(var) in takefirst
                     push!(row, data[i, Symbol(var)])
                 else
-                    push!(row, mean(data[i:(i+N-1), Symbol(var)]))
+                    push!(row, mean(data[i:(i + N - 1), Symbol(var)]))
                 end
             end
             push!(rolleddata, row)
@@ -406,7 +418,7 @@ Filter unphysical/undesirable data points out of the dataset, following physical
 - `data::DataFrame`: the cleaned and processed data.
 - `eps::Real`: a filtering threshold, set to 0.5 cm.
 """
-function filter_phys!(data::DataFrame; eps::Real=0.005)
+function filter_phys!(data::DataFrame; eps::Real = 0.005)
     #these need to be modified according to paper commentary and correct units.
     zero_condition1 =
         (data[!, :SWE] .< eps) .&
@@ -417,8 +429,8 @@ function filter_phys!(data::DataFrame; eps::Real=0.005)
     data = data[Not(zero_condition2), :]
     zero_condition3 = (data[!, :dzdt] .> 0.0) .& (data[!, :dprecipdt] .== 0.0)
     data = data[Not(zero_condition3), :]
-    data = data[data[!, :dSWEdt].<=data[!, :dprecipdt], :]
-    data = data[data[!, :SWE].<=data[!, :z], :]
+    data = data[data[!, :dSWEdt] .<= data[!, :dprecipdt], :]
+    data = data[data[!, :SWE] .<= data[!, :z], :]
     #zero_condition_temp = (abs.(data[!, :dzdt]) .< 2 * eps) .& (data[!, :air_temp_avg] .> 9.0)
     #data = data[Not(zero_condition_temp), :]
 end
@@ -438,7 +450,7 @@ Prepare a cleaned (scaled & gap-filled, potentially rolled) data stream or non-s
 """
 function prep_data(
     data::DataFrame;
-    extract_vars::Vector{Symbol}=[
+    extract_vars::Vector{Symbol} = [
         :date,
         :id,
         :z,
@@ -450,12 +462,12 @@ function prep_data(
         :dprecipdt_snow,
         :dzdt,
     ],
-    make_snow_split::Bool=true,
-    physical_filter::Bool=true,
-    eps::Real=0.005
+    make_snow_split::Bool = true,
+    physical_filter::Bool = true,
+    eps::Real = 0.005,
 )
     if physical_filter
-        filter_phys!(data, eps=eps)
+        filter_phys!(data, eps = eps)
     end
     if make_snow_split
         (dprecipdt_snow, dprecipdt_rain) = snowsplit(
@@ -494,10 +506,10 @@ function make_data(
     input_vars::Vector{Symbol},
     target::Symbol,
     target_scale::Real;
-    testidx=nothing,
-    dtype::Type=Float32
+    testidx = nothing,
+    dtype::Type = Float32,
 )
-    vardata = select(data, cat(dims=1, input_vars, target))
+    vardata = select(data, cat(dims = 1, input_vars, target))
     traindata = (isnothing(testidx)) ? vardata : vardata[(!).(testidx), :]
     x_train = Matrix{dtype}(traindata[!, Not(target)])'
     y_train = Vector{dtype}(traindata[!, target])' ./ dtype(target_scale)
@@ -520,18 +532,18 @@ Return a database of snotel station metadata for usage in dataset creation.
 [stationID, state.code, "elevation", "latitude", "longitude"].
 """
 function snotel_metadata(;
-    fields::Vector{String}=[
+    fields::Vector{String} = [
         "stationId",
         "state.code",
         "elevation",
-        "latitude,longitude"
-    ]
+        "latitude,longitude",
+    ],
 )
     link = "https://wcc.sc.egov.usda.gov/reportGenerator/view_csv/customMultipleStationReport,metric/daily/start_of_period/network=%22SNTL%22%7Cname/0,0/"
     for field in fields
         link = link * field * ","
     end
-    data = CSV.read(HTTP.get(link).body, DataFrame, comment="#", delim=",")
+    data = CSV.read(HTTP.get(link).body, DataFrame, comment = "#", delim = ",")
     return data
 end
 end

@@ -141,11 +141,11 @@ true_series = sitedata[!, :z]
 pred_series, _, _ = make_timeseries(model, sitedata, Δt)
 display_scores(pred_series, true_series, timeseries = true)
 siteplot(
-        sitedata[!, :date],
-        pred_series,
-        true_series,
-        "SITE: " * string(site_id) * ", Snow Depth (m)",
-        savename = "base_tutorial_plot.png"
+    sitedata[!, :date],
+    pred_series,
+    true_series,
+    "SITE: " * string(site_id) * ", Snow Depth (m)",
+    savename = "base_tutorial_plot.png",
 )
 # ![](base_tutorial_plot.png)
 

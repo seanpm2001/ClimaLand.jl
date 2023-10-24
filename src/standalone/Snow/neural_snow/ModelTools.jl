@@ -2,7 +2,13 @@ module ModelTools
 using Flux, LinearAlgebra
 using Flux.Data: DataLoader
 using DataFrames, Dates
-export make_model, get_model_ps, settimescale!, setoutscale!, LRmodel, make_timeseries, trainmodel!
+export make_model,
+    get_model_ps,
+    settimescale!,
+    setoutscale!,
+    LRmodel,
+    make_timeseries,
+    trainmodel!
 
 """
     make_model(nfeatures, n, z_idx, p_idx; in_scale, dtype)

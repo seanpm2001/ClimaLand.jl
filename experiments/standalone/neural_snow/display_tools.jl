@@ -21,7 +21,7 @@ function siteplot(
     title::String = "test";
     LR::Union{Nothing, Vector{<:Real}} = nothing,
     savename = nothing,
-    display_plot = false
+    display_plot = false,
 )
     plot(
         dates,
@@ -40,7 +40,7 @@ function siteplot(
         display(out)
     end
     if !isnothing(savename)
-        savefig(out, savename);
+        savefig(out, savename)
     end
 end
 
