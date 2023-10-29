@@ -110,7 +110,7 @@ function setoutscale!(model, scale::Real; dtype::Type = Float32)
 end
 
 """
-    LRmodel(data, vars, target; dtype, scale_const)
+    LinearModel(data, vars, target; dtype, scale_const)
 
 Create a linear regression model on a data frame for comparison to neural model.
 Returns the coefficients for the model.
@@ -122,7 +122,7 @@ Returns the coefficients for the model.
 - `dtype::Type`: Sets type, consistent with neural model. Default is Float32.
 - `scale_const`: Optional scaling constant for model output. Default is 1.0.
 """
-function LRmodel(
+function LinearModel(
     data::DataFrame,
     vars::Vector{Symbol},
     target::Symbol;
@@ -136,7 +136,7 @@ function LRmodel(
 end
 
 """
-    LRmodel(x_train, y_train; dtype, scale_const)
+    LinearModel(x_train, y_train; dtype, scale_const)
 
 Create a linear regression model on a training matrix for comparison to neural model.
 Returns the coefficients for the model.
@@ -148,7 +148,7 @@ Returns the coefficients for the model.
 - `dtype::Type`: Sets type, consistent with neural model. Default is Float32.
 - `scale_const`: Optional scaling constant for model output. Default is 1.0.
 """
-function LRmodel(
+function LinearModel(
     x_train::Matrix,
     y_train::Vector;
     dtype::Type = Float32,

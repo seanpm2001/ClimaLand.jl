@@ -48,7 +48,7 @@ using ClimaLSM.Snow.DataTools
 
 # and also some purpose-made functions for analyzing and displaying the output.
 using ClimaLSM
-code_dir = joinpath(pkgdir(ClimaLSM), "experiments/standalone/neural_snow")
+code_dir = joinpath(pkgdir(ClimaLSM), "docs/tutorials/Snow")
 include(joinpath(code_dir, "analysis_tools.jl"))
 include(joinpath(code_dir, "display_tools.jl"))
 
