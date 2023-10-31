@@ -6,7 +6,7 @@ export make_model,
     get_model_ps,
     settimescale!,
     setoutscale!,
-    LRmodel,
+    LinearModel,
     make_timeseries,
     trainmodel!
 
