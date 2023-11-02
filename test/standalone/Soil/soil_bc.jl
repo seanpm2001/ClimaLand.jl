@@ -198,3 +198,16 @@ for FT in (Float32, Float64)
         @test abs(flux_expected - flux_int) < eps(FT)
     end
 end
+
+
+@testset "Boundary vars" begin
+    # AtmosDrivenFluxBC method tested in `test/standalone/Soil/climate_drivers.jl`
+    # Currently no other methods exist
+    struct Foo <: Soil.AbstractSoilBC end
+    @test Soil.boundary_vars(Foo(), ClimaLSM.TopBoundary()) == ()
+    @test Soil.boundary_var_domain_names(Foo(), ClimaLSM.TopBoundary()) == ()
+    @test Soil.boundary_var_types(Foo(), ClimaLSM.TopBoundary()) == ()
+    @test Soil.boundary_vars(Foo(), ClimaLSM.BottomBoundary()) == ()
+    @test Soil.boundary_var_domain_names(Foo(), ClimaLSM.BottomBoundary()) == ()
+    @test Soil.boundary_var_types(Foo(), ClimaLSM.BottomBoundary()) == ()
+end

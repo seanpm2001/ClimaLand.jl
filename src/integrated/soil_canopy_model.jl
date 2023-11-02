@@ -188,11 +188,6 @@ included in the integrated Soil-Canopy model.
 interaction_vars(m::SoilCanopyModel) = (
     :root_extraction,
     :root_energy_extraction,
-    :soil_LW_n,
-    :soil_SW_n,
-    :soil_evap,
-    :soil_shf,
-    :soil_lhf,
     :T_soil,
     :LW_out,
     :SW_out,
@@ -207,7 +202,7 @@ The types of the additional auxiliary variables that are
 included in the integrated Soil-Canopy model.
 """
 interaction_types(m::SoilCanopyModel{FT}) where {FT} =
-    (FT, FT, FT, FT, FT, FT, FT, FT, FT, FT, FT, FT)
+    (FT, FT, FT, FT, FT, FT, FT)
 
 """
     interaction_domain_names(m::SoilCanopyModel)
@@ -215,20 +210,8 @@ interaction_types(m::SoilCanopyModel{FT}) where {FT} =
 The domain names of the additional auxiliary variables that are
 included in the integrated Soil-Canopy model.
 """
-interaction_domain_names(m::SoilCanopyModel) = (
-    :subsurface,
-    :subsurface,
-    :surface,
-    :surface,
-    :surface,
-    :surface,
-    :surface,
-    :surface,
-    :surface,
-    :surface,
-    :surface,
-    :surface,
-)
+interaction_domain_names(m::SoilCanopyModel) =
+    (:subsurface, :subsurface, :surface, :surface, :surface, :surface, :surface)
 
 """
     make_interactions_update_aux(
@@ -294,10 +277,7 @@ function make_interactions_update_aux(
 
         # Soil boundary fluxes under canopy or for bare soil
         bc = land.soil.boundary_conditions.top
-        soil_conditions = surface_fluxes(bc.atmos, land.soil, Y, p, t)
-        @. p.soil_shf = soil_conditions.shf
-        @. p.soil_evap = soil_conditions.vapor_flux
-        @. p.soil_lhf = soil_conditions.lhf
+        p.soil.sfc_conditions .= surface_fluxes(bc.atmos, land.soil, Y, p, t)
         p.T_soil .= surface_temperature(land.soil, Y, p, t)
         lsm_radiant_energy_fluxes!(
             p,
@@ -361,12 +341,11 @@ function lsm_radiant_energy_fluxes!(
     PAR = p.canopy.radiative_transfer.par
     NIR = p.canopy.radiative_transfer.nir
 
-    LW_net_soil = p.soil_LW_n
     LW_d_canopy = p.scratch1
     LW_u_soil = p.scratch2
     LW_net_canopy = p.canopy.radiative_transfer.LW_n
     SW_net_canopy = p.canopy.radiative_transfer.SW_n
-    SW_net_soil = p.soil_SW_n
+    R_net_soil = p.soil.R_n
     LW_out = p.LW_out
     SW_out = p.SW_out
 
@@ -383,7 +362,8 @@ function lsm_radiant_energy_fluxes!(
 
 
     # net soil = (1-α)*trans for par and nir
-    @. SW_net_soil =
+    R_net_soil .= FT(0)
+    @. R_net_soil +=
         energy_per_photon_NIR *
         N_a *
         p.canopy.radiative_transfer.tnir *
@@ -395,7 +375,7 @@ function lsm_radiant_energy_fluxes!(
 
     @. LW_d_canopy = (1 - ϵ_canopy) * LW_d + ϵ_canopy * _σ * T_canopy^4 # double checked
     @. LW_u_soil = ϵ_soil * _σ * T_soil^4 + (1 - ϵ_soil) * LW_d_canopy # double checked
-    @. LW_net_soil = ϵ_soil * LW_d_canopy - ϵ_soil * _σ * T_soil^4 # double checked
+    @. R_net_soil += ϵ_soil * LW_d_canopy - ϵ_soil * _σ * T_soil^4 # double checked
     @. LW_net_canopy =
         ϵ_canopy * LW_d - 2 * ϵ_canopy * _σ * T_canopy^4 + ϵ_canopy * LW_u_soil
     @. LW_out = (1 - ϵ_canopy) * LW_u_soil + ϵ_canopy * _σ * T_canopy^4 # double checked
@@ -435,13 +415,13 @@ function soil_boundary_fluxes(
 ) where {FT}
     infiltration = soil_surface_infiltration(
         bc.runoff,
-        FT.(bc.atmos.liquid_precip(t)) .+ p.soil_evap,
+        FT.(bc.atmos.liquid_precip(t) .+ p.soil.sfc_conditions.vapor_flux),
         Y,
         p,
         t,
         model.parameters,
     )
-    G = @. -p.soil_LW_n - p.soil_SW_n + p.soil_lhf + p.soil_shf
+    G = @. -p.soil.R_n + p.soil.sfc_conditions.lhf + p.soil.sfc_conditions.shf
     return infiltration, G
 end
 

@@ -1,10 +1,13 @@
-import ClimaLSM: AbstractBC, boundary_flux
+import ClimaLSM: AbstractBC, AbstractBoundary, boundary_flux
 export TemperatureStateBC,
     MoistureStateBC,
     FreeDrainage,
     FluxBC,
     AtmosDrivenFluxBC,
-    RichardsAtmosDrivenFluxBC
+    RichardsAtmosDrivenFluxBC,
+    boundary_vars,
+    boundary_var_domain_names,
+    boundary_var_types
 
 """
     AbstractSoilBC <: ClimaLSM. AbstractBC
@@ -12,6 +15,92 @@ export TemperatureStateBC,
 An abstract type for soil-specific types of boundary conditions, like free drainage.
 """
 abstract type AbstractSoilBC <: ClimaLSM.AbstractBC end
+
+
+"""
+    boundary_vars(::AbstractSoilBC, ::ClimaLSM.AbstractBoundary)
+
+The list of symbols for additional variables to add to the soil
+model auxiliary state, which defaults to nothing,
+but which can be extended depending on the type of boundary condition used.
+
+Use this function in the exact same way you would use `auxiliary_vars`.
+"""
+boundary_vars(::AbstractSoilBC, ::ClimaLSM.AbstractBoundary) = ()
+
+"""
+    bc_var_domain_names(::AbstractSoilBC, ::ClimaLSM.AbstractBoundary)
+
+The list of domain names for additional variables to add to the soil
+model auxiliary state, which defaults to nothing,
+but which can be extended depending on the type of boundary condition used.
+
+Use this function in the exact same way you would use `auxiliary_var_domain_names`.
+"""
+boundary_var_domain_names(::AbstractSoilBC, ::ClimaLSM.AbstractBoundary) = ()
+
+"""
+    boundary_var_types(::AbstractSoilBC, ::ClimaLSM.AbstractBoundary)
+
+The list of variable types for additional variables to add to the soil
+model auxiliary state, which defaults to nothing,
+but which can be extended depending on the type of boundary condition used.
+
+Use this function in the exact same way you would use `auxiliary_types`.
+"""
+boundary_var_types(::AbstractSoilBC, ::ClimaLSM.AbstractBoundary) = ()
+
+"""
+    boundary_vars(n::NamedTuple, b::ClimaLSM.TopBoundary)
+
+Method of `boundary_vars` for NamedTuples, because we store our boundary conditions 
+as a named tuple (; water = water_bc, heat = heat_bc), where water_bc and heat_bc are
+of type `AbstractSoilBC`.
+"""
+function boundary_vars(n::NamedTuple, b::ClimaLSM.TopBoundary)
+    keys = propertynames(n)
+    vars = ()
+    for key in keys
+        prop = getproperty(n, key)
+        vars = tuple(vars..., boundary_vars(prop, b)...)
+    end
+    return vars
+end
+
+"""
+    boundary_var_domain_names(n::NamedTuple, b::ClimaLSM.TopBoundary)
+
+Method of `boundary_var_domain_names` for NamedTuples, because we store our boundary conditions 
+as a named tuple (; water = water_bc, heat = heat_bc), where water_bc and heat_bc are
+of type `AbstractSoilBC`.
+"""
+function boundary_var_domain_names(n::NamedTuple, b::ClimaLSM.TopBoundary)
+    keys = propertynames(n)
+    vars = ()
+    for key in keys
+        prop = getproperty(n, key)
+        vars = tuple(vars..., boundary_var_domain_names(prop, b)...)
+    end
+    return vars
+end
+
+
+"""
+    boundary_var_types(n::NamedTuple, b::ClimaLSM.TopBoundary)
+
+Method of `boundary_var_types` for NamedTuples, because we store our boundary conditions 
+as a named tuple (; water = water_bc, heat = heat_bc), where water_bc and heat_bc are
+of type `AbstractSoilBC`.
+"""
+function boundary_var_types(n::NamedTuple, b::ClimaLSM.TopBoundary)
+    keys = propertynames(n)
+    vars = ()
+    for key in keys
+        prop = getproperty(n, key)
+        vars = tuple(vars..., boundary_var_types(prop, b)...)
+    end
+    return vars
+end
 
 """
    MoistureStateBC <: AbstractSoilBC
@@ -128,6 +217,49 @@ function AtmosDrivenFluxBC(atmos, radiation; runoff = NoRunoff())
 end
 
 """
+    boundary_vars(::AtmosDrivenFluxBC, ::ClimaLSM.TopBoundary)
+
+An extension of the `boundary_vars` method for AtmosDrivenFluxBC. This
+adds the surface conditions (SHF, LHF, evaporation, and resistance) and the
+net radiation to the auxiliary variables.
+
+These variables are updated in place in `soil_boundary_fluxes`.
+"""
+boundary_vars(bc::AtmosDrivenFluxBC, ::ClimaLSM.TopBoundary) =
+    (:sfc_conditions, :R_n)
+
+"""
+    boundary_var_domain_names(::AtmosDrivenFluxBC, ::ClimaLSM.TopBoundary))
+
+An extension of the `boundary_var_domain_names` method for AtmosDrivenFluxBC. This
+specifies the part of the domain on which the additional variables should be
+defined.
+"""
+boundary_var_domain_names(bc::AtmosDrivenFluxBC, ::ClimaLSM.TopBoundary) =
+    (:surface, :surface)
+"""
+    boundary_var_types(
+        ::AtmosDrivenFluxBC{
+            <:AbstractAtmosphericDrivers{FT},
+            <:AbstractRadiativeDrivers{FT},
+            <:AbstractRunoffModel,
+        }, ::ClimaLSM.TopBoundary,
+    ) where {FT}
+
+An extension of the `boundary_var_types` method for AtmosDrivenFluxBC. This
+specifies the type of the additional variables.
+"""
+boundary_var_types(
+    bc::AtmosDrivenFluxBC{
+        <:AbstractAtmosphericDrivers{FT},
+        <:AbstractRadiativeDrivers{FT},
+        <:AbstractRunoffModel,
+    },
+    ::ClimaLSM.TopBoundary,
+) where {FT} = (NamedTuple{(:lhf, :shf, :vapor_flux, :r_ae), NTuple{4, FT}}, FT)
+
+
+"""
     soil_boundary_fluxes(
         bc::AtmosDrivenFluxBC{
             <:PrescribedAtmosphere,
@@ -172,19 +304,20 @@ function soil_boundary_fluxes(
     t,
 ) where {FT}
 
-    conditions = surface_fluxes(bc.atmos, model, Y, p, t)
-    R_n = net_radiation(bc.radiation, model, Y, p, t)
+    p.soil.sfc_conditions .= surface_fluxes(bc.atmos, model, Y, p, t)
+    p.soil.R_n .= net_radiation(bc.radiation, model, Y, p, t)
     # We are ignoring sublimation for now
     precip = FT.(bc.atmos.liquid_precip(t))
     infiltration = soil_surface_infiltration(
         bc.runoff,
-        precip .+ conditions.vapor_flux,
+        precip .+ p.soil.sfc_conditions.vapor_flux,
         Y,
         p,
         model.parameters,
     )
     # We do not model the energy flux from infiltration
-    net_energy_flux = @. R_n + conditions.lhf + conditions.shf
+    net_energy_flux =
+        @. p.soil.R_n + p.soil.sfc_conditions.lhf + p.soil.sfc_conditions.shf
     return infiltration, net_energy_flux
 
 end

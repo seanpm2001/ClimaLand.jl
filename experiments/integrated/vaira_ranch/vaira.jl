@@ -516,7 +516,10 @@ T =
         k in 1:length(sol.t)
     ] .* (1e3 * 24 * 3600)
 E =
-    [parent(sv.saveval[k].soil_evap)[1] for k in 1:length(sol.t)] .* (1e3 * 24 * 3600)
+    [
+        parent(sv.saveval[k].soil.sfc_conditions.vapor_flux)[1] for
+        k in 1:length(sol.t)
+    ] .* (1e3 * 24 * 3600)
 measured_T = LE ./ (LSMP.LH_v0(earth_param_set) * 1000) .* (1e3 * 24 * 3600)
 
 ET_avg_model = diurnal_avg(T .+ E)
@@ -615,8 +618,8 @@ Plots.plot(plt2, plt1, layout = grid(2, 1, heights = [0.2, 0.8]))
 Plots.savefig(joinpath(savedir, "soil_water_content.png"))
 
 # Sensible Heat Flux
-
-SHF_soil = [parent(sv.saveval[k].soil_shf)[1] for k in 1:length(sol.t)]
+SHF_soil =
+    [parent(sv.saveval[k].soil.sfc_conditions.shf)[1] for k in 1:length(sol.t)]
 SHF_canopy =
     [parent(sv.saveval[k].canopy.energy.shf)[1] for k in 1:length(sol.t)]
 SHF = SHF_soil + SHF_canopy
@@ -665,8 +668,8 @@ Plots.plot!(
 Plots.savefig(joinpath(savedir, "shf.png"))
 
 # Latent Heat Flux
-
-LHF_soil = [parent(sv.saveval[k].soil_lhf)[1] for k in 1:length(sol.t)]
+LHF_soil =
+    [parent(sv.saveval[k].soil.sfc_conditions.lhf)[1] for k in 1:length(sol.t)]
 LHF_canopy =
     [parent(sv.saveval[k].canopy.energy.lhf)[1] for k in 1:length(sol.t)]
 LHF = LHF_soil + LHF_canopy
@@ -867,9 +870,9 @@ first_layer_flux = [
 ]
 G_model = [
     (
-        parent(sv.saveval[k].soil_shf)[1] + parent(sv.saveval[k].soil_lhf)[1] -
-        parent(sv.saveval[k].soil_LW_n)[1] -
-        parent(sv.saveval[k].soil_SW_n)[1]
+        parent(sv.saveval[k].soil.sfc_conditions.shf)[1] +
+        parent(sv.saveval[k].soil.sfc_conditions.lhf)[1] -
+        parent(sv.saveval[k].soil.R_n)[1]
     ) for k in 1:length(sol.t)
 ]
 canopy_G = [
