@@ -1,6 +1,5 @@
 module ModelTools
 using Flux, LinearAlgebra
-using Flux.Data: DataLoader
 using DataFrames, Dates
 export make_model,
     get_model_ps,
@@ -297,7 +296,7 @@ function trainmodel!(
     verbose = false,
     cb = Nothing,
 )
-    train_loader = DataLoader(
+    train_loader = Flux.DataLoader(
         (x_train, y_train),
         batchsize = nbatch,
         partial = false,
