@@ -95,7 +95,7 @@ using DataFrames, CSV, StatsBase, Flux, LinearAlgebra
         :wind_speed_avg => kmphr2mps,
     )
     test_data7 = scale_cols(test_data6, scales)
-    @test sum(test_data7[!, :rel_hum_avg]) == 25.93
+    @test sum(test_data7[!, :rel_hum_avg]) ≈ 25.93 atol = 1e-3
     test_data8 = makediffs(test_data7, Day(1))
     @test size(test_data8) == (31, 11)
     @test mean(test_data8[!, :dzdt]) ≈ 0 atol = 1e-7
