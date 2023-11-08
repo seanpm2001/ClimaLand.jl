@@ -50,14 +50,14 @@ using ClimaLSM.Snow.DataTools
 using ClimaLSM
 code_dir = joinpath(pkgdir(ClimaLSM), "docs/tutorials/Snow")
 include(joinpath(code_dir, "analysis_tools.jl"))
-include(joinpath(code_dir, "display_tools.jl"))
+include(joinpath(code_dir, "display_tools.jl"));
 
 # Next, we set up values of the network hyperparameters, including the
 # number of epochs to train it, as well as the width parameter ``n`` as outlined
 # in the associated parameter, and the two loss function hyperparameters ``n_1``, ``n_2``.
 n = 5
 n1 = 1
-n2 = 1
+n2 = 1;
 
 # We next outline which variables in the dataset will be used as predictors,
 # calling them by their column name as a `Symbol`. The number and choice of these
@@ -72,7 +72,7 @@ pred_vars = [
     :air_temp_avg,
     :dprecipdt_snow,
 ]
-target = :dzdt
+target = :dzdt;
 
 # Specifying the indices of the depth and precipitation variables
 # (used in the constraints) and the total number of input features
@@ -80,7 +80,7 @@ target = :dzdt
 # here as well.
 nfeatures = length(pred_vars)
 z_idx = 1
-p_idx = 7
+p_idx = 7;
 
 # We next read in the already-cleaned dataset, though for custom datasets
 # there is plenty of functionality provided in [`DataTools`](@ref
@@ -90,12 +90,12 @@ p_idx = 7
 # To see the code that generated this data file, check out the [data tutorial](@ref data_tutorial.jl).
 data_download_link = "https://caltech.box.com/shared/static/n59m3iqcgr60gllp65rsrd3k0mtnsfmg.csv"
 data = CSV.read(HTTP.get(data_download_link).body, DataFrame)
-Δt = Second(86400)
+Δt = Second(86400);
 
 # With this, we can begin the actual usage pipeline. First, we split the
 # precipitation feature into rain and snow constituents, and apply a set of physically-informed
 # filters before extracting the necessary features with `prep_data`:
-usedata = prep_data(data)
+usedata = prep_data(data);
 
 # After this, we determine scalings for the input and target data
 # that are conducive to beneficial weight updates. In this case, the
@@ -107,24 +107,24 @@ usedata = prep_data(data)
 # a Flux `DataLoader` object, later, during training.
 out_scale = maximum(abs.(usedata[!, target]))
 in_scales = std.(eachcol(select(usedata, pred_vars)))
-x_train, y_train = make_data(usedata, pred_vars, target, out_scale)
+x_train, y_train = make_data(usedata, pred_vars, target, out_scale);
 
 # We then create the model itself given the hyperparameters specified
 # above, and indicate which features are to be used to determine the
 # boundary constraints on the network, and return the trainable weights
 # for the overall model.
 model = make_model(nfeatures, n, z_idx, p_idx, in_scale = in_scales)
-ps = get_model_ps(model)
+ps = get_model_ps(model);
 
 # As training updates are better with the scaled data, we have to modify
 # the timescale and output scaling of the model structure prior to training.
 # This step is undone/reset after training is over.
 settimescale!(model, Dates.value(Δt) * out_scale)
-setoutscale!(model, 1.0)
+setoutscale!(model, 1.0);
 
 # With that, training is as simple as calling the `trainmodel!` function:
 print("\nTraining model!\n")
-trainmodel!(model, ps, x_train, y_train, n1, n2, verbose = true)
+trainmodel!(model, ps, x_train, y_train, n1, n2, verbose = true);
 
 # To show the model's output on some of our training data in physically meaningful
 # units, we first reset the timesacle and output scaling constants. From there,
@@ -132,7 +132,7 @@ trainmodel!(model, ps, x_train, y_train, n1, n2, verbose = true)
 # to the `make_timeseries` function, and we can compare the result to the actual data.
 print("\nGenerating Timeseries!\n")
 setoutscale!(model, out_scale)
-settimescale!(model, Dates.value(Δt))
+settimescale!(model, Dates.value(Δt));
 
 # For instance, let's show the results on site 1286 (Slagamount Lakes site, Montana):
 site_id = 1286
