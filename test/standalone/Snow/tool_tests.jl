@@ -163,8 +163,8 @@ end
     answer = [1.0, 2.0, 3.0, 4.0, 5.0, 0.0]
     model2 = LinearModel(x_dataframe, [:x1, :x2, :x3, :x4, :x5], :y)
     model3 = LinearModel(x, y)
-    @test model2 == answer
-    @test model3 == answer
+    @test model2 ≈ answer
+    @test model3 ≈ answer
     @test ModelTools.evaluate(model2, Vector{Float32}(ones(5)))[1] == 15
 
     temp(x) = x

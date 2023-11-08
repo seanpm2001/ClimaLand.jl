@@ -161,9 +161,9 @@ end
     # model's functions
     set_initial_aux_state! = ClimaLSM.make_set_initial_aux_state(m)
     set_initial_aux_state!(p, Y, FT(0.0))
-    @test all(parent(p.m1.a) .== FT(2.0))
-    @test all(parent(p.m1.b) .== FT(10.0))
-    @test all(parent(p.m2.c) .== FT(10.0))
-    @test all(parent(p.m2.d) .== FT(10.0))
+    @test all(parent(p.m1.a) .== FT(2))
+    @test all(parent(p.m1.b) .== FT(10))
+    @test all(parent(p.m2.c) .== FT(10))
+    @test all(parent(p.m2.d) .== FT(10))
 
 end
