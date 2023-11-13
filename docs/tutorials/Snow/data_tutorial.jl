@@ -41,7 +41,7 @@ scales = Dict{Symbol, Real}(
     :precip => inch2meter,
     :rel_hum_avg => 0.01,
     :wind_speed_avg => kmphr2mps,
-)
+);
 
 # We next proceed to outline which stations will be scraped by defining
 # a dictionary of station IDs, paired with the date range to be scraped.
@@ -49,7 +49,7 @@ scales = Dict{Symbol, Real}(
 # refers to 2023-01-01 or the last available date. Most of these stations
 # are commented out for the sake of speed and readability in generating
 # the tutorial, but can be uncommented to yield the full dataset found in
-# `cleandata.csv` used in the [base tutorial](@ref base_tutorial.jl). Stations were
+# `cleandata.csv` used in the [base tutorial](./base_tutorial.jl). Stations were
 # selected based upon their availability of the features utilized in
 # creating the model used in the paper.
 
@@ -93,16 +93,16 @@ good_stations = Dict{Int, Tuple{String, String}}(
     969 => ("2011-01-01", "end"),
     974 => ("start", "end"),
     978 => ("2005-01-01", "2018-01-01"),=#
-)
+);
 
 # We also extract a `DataFrame` matching station ID to various station metadata,
 # in order to automate some of the scraping process and pass some station
 # metadata that is used for analysis in the paper. This resulting `DataFrame`
 # can also be used to see other available SNOTEL station IDs for scraping,
 # in order to create custom datasets.
-metadata = snotel_metadata()
+metadata = snotel_metadata();
 metacols = ["id", "state", "elev", "lat", "lon"]
-DataFrames.rename!(metadata, Symbol.(metacols))
+DataFrames.rename!(metadata, Symbol.(metacols));
 
 # We then loop through each site to scrape and follow an automated data pipeline, consisting of:
 # - Extracting the daily and hourly timeseries from the site
@@ -115,12 +115,12 @@ DataFrames.rename!(metadata, Symbol.(metacols))
 # - Removing negative precipitation cases (i.e. where the water year resets, or sensor error)
 # - Attaching appropriate metadata
 
-allsites = Any[]
+allsites = Any[];
 for site in sort(collect(keys(good_stations)))
     state = metadata[metadata[!, :id] .== site, :state][1]
     start_date = good_stations[site][1]
     end_date = good_stations[site][2]
-    print(
+    #=print(
         "\nSITE: ",
         site,
         " (",
@@ -130,7 +130,7 @@ for site in sort(collect(keys(good_stations)))
         " TO ",
         end_date,
         "\n",
-    )
+    )=#
     daily = apply_bounds(
         sitedata_daily(site, state, start = start_date, finish = end_date),
         filter_val,
@@ -146,8 +146,8 @@ for site in sort(collect(keys(good_stations)))
     daily_clean = makediffs(daily_clean, Day(1))
     good_vals = daily_clean[!, :dprecipdt] .>= 0.0
     daily_clean = daily_clean[good_vals, Not(:precip)]
-    show(describe(daily_clean), allrows = true, allcols = true)
-    print("\nSIZE: ", nrow(daily_clean), "\n")
+    #show(describe(daily_clean), allrows = true, allcols = true)
+    #print("\nSIZE: ", nrow(daily_clean), "\n")
 
     daily_clean[!, :id] .= site
     daily_clean[!, :elev] .= metadata[metadata[!, :id] .== site, :elev][1]
@@ -155,7 +155,7 @@ for site in sort(collect(keys(good_stations)))
     daily_clean[!, :lon] .= metadata[metadata[!, :id] .== site, :lon][1]
 
     push!(allsites, daily_clean)
-end
+end;
 
 # With the sites complete, we condense all sites into a single `DataFrame`,
 totaldata = deepcopy(allsites[1])
