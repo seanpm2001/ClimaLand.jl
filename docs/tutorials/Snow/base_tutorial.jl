@@ -5,7 +5,7 @@
 # structurally-enforced constraints. The following steps through a
 # basic use-case of the system on an already-cleaned dataset, though
 # exploration of optional keyword arguments in the developed code and
-# additional tools for scraping data (explained in the [data tutorial](./data_tutorial.jl))
+# additional tools for scraping data (explained in the [data tutorial](../data_tutorial.jl))
 # provide for a richer set of functionality.
 
 # The updates of the neural snow model follow the equation
@@ -87,7 +87,7 @@ p_idx = 7;
 # ClimaLSM.Snow.DataTools) to scrape SNOTEL data directly. We also set the
 # unit timestep seen in this data (daily, so 1 day) to be used for
 # setting the network's constraints as well as generating timeseries during usage.
-# To see the code that generated this data file, check out the [data tutorial](./data_tutorial.jl).
+# To see the code that generated this data file, check out the [data tutorial](../data_tutorial.jl).
 data_download_link = "https://caltech.box.com/shared/static/n59m3iqcgr60gllp65rsrd3k0mtnsfmg.csv"
 data = CSV.read(HTTP.get(data_download_link).body, DataFrame)
 Δt = Second(86400);
