@@ -169,6 +169,7 @@ function hdwrite_regridfile_rll_to_cgll(
     hd_outfile_root;
     mono = false,
 )
+    @show "in hdwrite_regridfile_rll_to_cgll"
     out_type = "cgll"
 
     outfile = hd_outfile_root * ".nc"
@@ -246,6 +247,7 @@ function hdwrite_regridfile_rll_to_cgll(
             times = get_time(ds_wt),
         )
     end
+    @show "after get_time"
 
     # weightfile info needed to populate all nodes and save into fields with
     #  sparse matrices
@@ -253,6 +255,7 @@ function hdwrite_regridfile_rll_to_cgll(
         (Array(ds_wt["S"]), Array(ds_wt["col"]), Array(ds_wt["row"]))
     end
 
+    @show "before index business"
     target_unique_idxs =
         out_type == "cgll" ?
         collect(ClimaCore.Spaces.unique_nodes(space_undistributed)) :
@@ -271,6 +274,7 @@ function hdwrite_regridfile_rll_to_cgll(
 
     offline_fields = ntuple(x -> similar(offline_field), length(times))
 
+    @show "before reshape_cgll_sparse_to_field!"
     ntuple(
         x -> reshape_cgll_sparse_to_field!(
             offline_fields[x],
@@ -282,6 +286,8 @@ function hdwrite_regridfile_rll_to_cgll(
 
     # TODO: extend write! to handle time-dependent fields
     comms_ctx = space.topology.context
+    @show comms_ctx
+    @show "before write_to_hdf5"
     map(
         x -> write_to_hdf5(
             REGRID_DIR,
@@ -293,10 +299,12 @@ function hdwrite_regridfile_rll_to_cgll(
         ),
         1:length(times),
     )
+    @show "before jldsave"
     jldsave(
         joinpath(REGRID_DIR, hd_outfile_root * "_times.jld2");
         times = times,
     )
+    @show "end of hdwrite_regridfile_rll_to_cgll"
 end
 
 
@@ -315,6 +323,7 @@ function regrid_netcdf_to_field(
     outfile_root = string(varname, "_cgll"),
     mono = true,
 )
+    @show "in regrid_netcdf_to_field"
 
     if ClimaComms.iamroot(comms_ctx)
         hdwrite_regridfile_rll_to_cgll(
@@ -327,7 +336,9 @@ function regrid_netcdf_to_field(
             mono = mono,
         )
     end
+    @show "before regrid_netcdf_to_field barrier"
     ClimaComms.barrier(comms_ctx)
+    @show "after regrid_netcdf_to_field barrier"
     file_dates =
         load(joinpath(REGRID_DIR, outfile_root * "_times.jld2"), "times")
     field = read_from_hdf5(
