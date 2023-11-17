@@ -288,6 +288,7 @@ function hdwrite_regridfile_rll_to_cgll(
     comms_ctx = space.topology.context
     @show comms_ctx
     @show "before write_to_hdf5"
+    @show "using singleton ctx"
     map(
         x -> write_to_hdf5(
             REGRID_DIR,
