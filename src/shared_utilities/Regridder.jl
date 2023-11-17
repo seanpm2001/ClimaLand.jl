@@ -295,7 +295,7 @@ function hdwrite_regridfile_rll_to_cgll(
             times[x],
             offline_fields[x],
             varname,
-            comms_ctx,
+            ClimaComms.SingletonCommsContext(),
         ),
         1:length(times),
     )
