@@ -232,7 +232,7 @@ for FT in (Float32, Float64)
                 z,
             )
             soil_drivers = Soil.Biogeochemistry.SoilDrivers(
-                Soil.Biogeochemistry.PrescribedMet{FT}(Csom, Csom),
+                Soil.Biogeochemistry.PrescribedMet(Csom, Csom),
                 Soil.Biogeochemistry.PrescribedSOC{FT}(Csom),
                 atmos,
             )

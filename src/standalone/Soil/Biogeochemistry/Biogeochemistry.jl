@@ -307,7 +307,7 @@ struct SoilDrivers{FT}
 end
 
 """
-    PrescribedMet <: AbstractSoilDriver
+    PrescribedMet{F1 <: Function, F2 <: Function} <: AbstractSoilDriver
 
 A container which holds the prescribed functions for soil temperature
 and moisture.
@@ -317,11 +317,11 @@ without a prognostic soil model.
 
 $(DocStringExtensions.FIELDS)
 """
-struct PrescribedMet{FT} <: AbstractSoilDriver
+struct PrescribedMet{F1 <: Function, F2 <: Function} <: AbstractSoilDriver
     "The temperature of the soil, of the form f(z::FT,t) where FT <: AbstractFloat"
-    temperature::Function
+    temperature::F1
     "Soil moisture, of the form f(z::FT,t) FT <: AbstractFloat"
-    volumetric_liquid_fraction::Function
+    volumetric_liquid_fraction::F2
 end
 
 """
