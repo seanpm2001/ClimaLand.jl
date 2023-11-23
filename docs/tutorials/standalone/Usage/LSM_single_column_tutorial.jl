@@ -177,7 +177,7 @@ precipitation(t) = t < 20 ? -1e-5 : 0.0 # m/s
 
 infiltration(t) = -(1e-6) #m/s
 pond_model = Pond.PondModel{FT}(;
-    runoff = PrescribedRunoff{FT}(precipitation, infiltration),
+    runoff = PrescribedRunoff(precipitation, infiltration),
 );
 
 # Here, `PrescribedRunoff` is the structure holding the prescribed
