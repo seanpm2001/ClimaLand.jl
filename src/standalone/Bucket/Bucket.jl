@@ -63,10 +63,11 @@ include(
 
 abstract type AbstractBucketModel{FT} <: AbstractExpModel{FT} end
 
-abstract type AbstractLandAlbedoModel{FT <: AbstractFloat} end
+abstract type AbstractLandAlbedoModel end
 
 """
-    BulkAlbedoFunction{FT} <: AbstractLandAlbedoModel
+    BulkAlbedoFunction{FT <: AbstractFloat,
+                       F <: Function} <: AbstractLandAlbedoModel
 
 An albedo model where the albedo of different surface types
 is specified. Snow albedo is treated as constant across snow
@@ -75,9 +76,10 @@ is specified as a function
 of latitude and longitude, but is also treated as constant across
 wavelength; surface is this context refers to soil and vegetation.
 """
-struct BulkAlbedoFunction{FT} <: AbstractLandAlbedoModel{FT}
+struct BulkAlbedoFunction{FT <: AbstractFloat, F <: Function} <:
+       AbstractLandAlbedoModel
     α_snow::FT
-    α_sfc::Function
+    α_sfc::F
 end
 
 """
@@ -93,7 +95,7 @@ to soil and vegetation. This albedo type is static in time.
 Note that this option should only be used with global simulations,
 i.e. with a `ClimaLSM.LSMSphericalShellDomain.`
 """
-struct BulkAlbedoStatic{FT} <: AbstractLandAlbedoModel{FT}
+struct BulkAlbedoStatic{FT} <: AbstractLandAlbedoModel
     α_snow::FT
     α_sfc::PrescribedDataStatic
 end
@@ -138,7 +140,7 @@ This albedo type changes over time according to the input file.
 Note that this option should only be used with global simulations,
 i.e. with a `ClimaLSM.LSMSphericalShellDomain.`
 """
-struct BulkAlbedoTemporal{FT} <: AbstractLandAlbedoModel{FT}
+struct BulkAlbedoTemporal{FT} <: AbstractLandAlbedoModel
     albedo_info::FileReader.PrescribedDataTemporal
 end
 
@@ -343,21 +345,21 @@ end
 
 """
     function set_initial_parameter_field!(
-        albedo::BulkAlbedoFunction{FT},
+        albedo::BulkAlbedoFunction,
         p,
         surface_coords,
-    ) where {FT}
+    )
 
 Updates the spatially-varying but constant in time surface
  albedo stored in the
 auxiliary vector `p` in place,  according to the
-passed function of latitute and longitude stored in `albedo.α_sfc`.
+passed function of latitude and longitude stored in `albedo.α_sfc`.
 """
 function set_initial_parameter_field!(
-    albedo::BulkAlbedoFunction{FT},
+    albedo::BulkAlbedoFunction,
     p,
     surface_coords,
-) where {FT}
+)
     (; α_sfc) = albedo
     @. p.bucket.α_sfc = α_sfc(surface_coords)
 end
@@ -552,7 +554,7 @@ function make_update_aux(model::BucketModel{FT}) where {FT}
 end
 
 """
-    next_albedo(model_albedo::Union{BulkAlbedoFunction{FT}, BulkAlbedoStatic{FT}},
+    next_albedo(model_albedo::Union{BulkAlbedoFunction, BulkAlbedoStatic{FT}},
         parameters, Y, p, t)
 
 Update the surface albedo for time `t`. These albedo model types aren't explicitly
@@ -563,12 +565,12 @@ of snow and of the surface, based on the snow water equivalent `S` relative to
 the parameter `S_c`. The linear interpolation is taken from Lague et al 2019.
 """
 function next_albedo(
-    model_albedo::Union{BulkAlbedoFunction{FT}, BulkAlbedoStatic{FT}},
+    model_albedo::Union{BulkAlbedoFunction, BulkAlbedoStatic},
     parameters,
     Y,
     p,
     t,
-) where {FT}
+)
     (; α_snow) = model_albedo
     (; σS_c) = parameters
     α_sfc = p.bucket.α_sfc
