@@ -106,7 +106,7 @@ for FT in (Float32, Float64)
 
         soil_drivers = Soil.Biogeochemistry.SoilDrivers(
             Soil.Biogeochemistry.PrognosticMet{FT}(),
-            Soil.Biogeochemistry.PrescribedSOC{FT}(Csom),
+            Soil.Biogeochemistry.PrescribedSOC(Csom),
             atmos,
         )
         soilco2_args = (;
@@ -179,7 +179,7 @@ for FT in (Float32, Float64)
             )
             soil_drivers = Soil.Biogeochemistry.SoilDrivers(
                 Soil.Biogeochemistry.PrognosticMet{FT}(),
-                Soil.Biogeochemistry.PrescribedSOC{FT}(Csom),
+                Soil.Biogeochemistry.PrescribedSOC(Csom),
                 atmos,
             )
             soilco2_args = (;
@@ -233,7 +233,7 @@ for FT in (Float32, Float64)
             )
             soil_drivers = Soil.Biogeochemistry.SoilDrivers(
                 Soil.Biogeochemistry.PrescribedMet(Csom, Csom),
-                Soil.Biogeochemistry.PrescribedSOC{FT}(Csom),
+                Soil.Biogeochemistry.PrescribedSOC(Csom),
                 atmos,
             )
             soilco2_args = (;

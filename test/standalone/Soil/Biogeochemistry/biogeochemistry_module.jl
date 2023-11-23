@@ -58,11 +58,8 @@ for FT in (Float32, Float64)
             c_co2 = atmos_co2,
         )
 
-        soil_drivers = SoilDrivers(
-            PrescribedMet(T_soil, θ_l),
-            PrescribedSOC{FT}(Csom),
-            atmos,
-        )
+        soil_drivers =
+            SoilDrivers(PrescribedMet(T_soil, θ_l), PrescribedSOC(Csom), atmos)
 
         model = SoilCO2Model{FT}(;
             parameters = parameters,
@@ -131,7 +128,7 @@ for FT in (Float32, Float64)
 
         soil_drivers = SoilDrivers(
             PrescribedMet(T_soil, θ_l),
-            PrescribedSOC{FT}(Csom),
+            PrescribedSOC(Csom),
             atmos, # need to create some functions
         )
 

@@ -109,7 +109,7 @@ for float_type in (Float32, Float64)
 
     soilco2_drivers = Soil.Biogeochemistry.SoilDrivers(
         Soil.Biogeochemistry.PrognosticMet{FT}(),
-        Soil.Biogeochemistry.PrescribedSOC{FT}(Csom),
+        Soil.Biogeochemistry.PrescribedSOC(Csom),
         atmos,
     )
 

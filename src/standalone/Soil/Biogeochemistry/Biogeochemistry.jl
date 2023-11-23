@@ -334,9 +334,9 @@ organic carbon model.
 
 $(DocStringExtensions.FIELDS)
 """
-struct PrescribedSOC{FT} <: AbstractSoilDriver
+struct PrescribedSOC{F <: Function} <: AbstractSoilDriver
     "Carbon content of soil organic matter, of the form f(z::FT, t) where FT <: AbstractFloat"
-    soil_organic_carbon::Function
+    soil_organic_carbon::F
 end
 
 """
