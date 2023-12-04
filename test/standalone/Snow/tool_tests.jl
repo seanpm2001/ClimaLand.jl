@@ -166,12 +166,14 @@ end
     @test model2 ≈ answer
     @test model3 ≈ answer
     @test ModelTools.evaluate(model2, Vector{Float32}(ones(5)))[1] == 15
+    @test typeof(ModelTools.evaluate(model2, Vector{Float32}(ones(5)))[1]) == Float32
 
     temp(x) = x
     test_loss_check(x, y) = ModelTools.custom_loss(x, y, temp, 2, 1)
-    input_x = [1, 2, 3, 4, 5]
-    input_y = [2, 3, 5, 2, 3]
-    @test test_loss_check(input_x, input_y) == 11.8
+    input_x = Vector{Float32}([1, 2, 3, 4, 5])
+    input_y = Vector{Float32}([2, 3, 5, 2, 3])
+    @test test_loss_check(input_x, input_y) == 11.8f0
+    @test typeof(test_loss_check(input_x, input_y)) == Float32
 
     data_download_link = "https://caltech.box.com/shared/static/n59m3iqcgr60gllp65rsrd3k0mtnsfmg.csv"
     model_download_link = "https://caltech.box.com/shared/static/bbu12b518i49aj3pl6b8t9t05twl5teq.bson"
@@ -221,5 +223,3 @@ end
         sqrt(sum((pred_series .- true_series) .^ 2) ./ length(pred_series))
     @test series_err <= 0.2
 end
-
-#add this script to the run_tests file

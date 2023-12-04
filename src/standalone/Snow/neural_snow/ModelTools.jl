@@ -64,9 +64,6 @@ function make_model(
     )
     return model
 end
-# Do we want to modify this to take a list of input features, and the names of the depth and precipitation variables,
-# instead of specifying nfeatures, z_idx, p_idx? Same functionality but simplifies the usage pipeline.
-
 
 """
     get_model_ps(model)
@@ -131,7 +128,7 @@ function LinearModel(
     X = Matrix{dtype}(select(data, vars))
     y = Vector{dtype}(data[!, target]) ./ dtype(scale_const)
     constants = [X ones(nrow(data))] \ y
-    return constants .* scale_const
+    return Vector{dtype}(constants .* scale_const)
 end
 
 """
@@ -261,7 +258,7 @@ Creates a loss function to be used during training specified by two hyperparamet
 - `n2::Int`: the hyperparameter dictating the weighting of a given mismatch error by the target magnitude.
 """
 function custom_loss(x, y, model, n1, n2)
-    sum(abs.(model(x) - y) .^ n1 .* (1.0 .+ abs.(y) .^ n2)) ./ length(y)
+    sum(abs.(model(x) - y) .^ n1 .* (1 .+ abs.(y) .^ n2)) ./ length(y)
 end
 
 """
