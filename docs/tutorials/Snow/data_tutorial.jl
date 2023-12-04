@@ -49,7 +49,7 @@ scales = Dict{Symbol, Real}(
 # refers to 2023-01-01 or the last available date. Most of these stations
 # are commented out for the sake of speed and readability in generating
 # the tutorial, but can be uncommented to yield the full dataset found in
-# `cleandata.csv` used in the [base tutorial](../base_tutorial.jl). Stations were
+# `cleandata.csv` used in the [base tutorial](../base_tutorial/). Stations were
 # selected based upon their availability of the features utilized in
 # creating the model used in the paper.
 
