@@ -206,8 +206,11 @@ function PrescribedDataTemporal{FT}(
 
     # Regrid data at all times from lat/lon (RLL) to simulation grid (CGLL)
     # Download `infile_path` artifact on root process first to avoid race condition
+    @show "before iamroot"
     if ClimaComms.iamroot(comms_ctx)
+        @show "inside iamroot"
         infile_path = get_infile()
+        @show "after root get_infile"
         Regridder.hdwrite_regridfile_rll_to_cgll(
             FT,
             regrid_dirpath,
@@ -217,6 +220,7 @@ function PrescribedDataTemporal{FT}(
             outfile_root;
             mono = mono,
         )
+        @show "after regrid"
 
         NCDataset(infile_path, "r") do ds
             if !("time" in keys(ds))
@@ -225,9 +229,13 @@ function PrescribedDataTemporal{FT}(
                 )
             end
         end
+        @show "end of if iamroot"
     end
+    @show "after iamroot"
     ClimaComms.barrier(comms_ctx)
+    @show "after barrier"
     infile_path = get_infile()
+    @show "after all-pid get_infile"
 
     all_dates = JLD2.load(
         joinpath(regrid_dirpath, outfile_root * "_times.jld2"),
