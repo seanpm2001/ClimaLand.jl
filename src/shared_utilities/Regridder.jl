@@ -53,6 +53,13 @@ function reshape_cgll_sparse_to_field!(
     ClimaCore.Topologies.dss!(target, topology)
 end
 
+function swap_space!(field, new_space)
+    return ClimaCore.Fields.Field(
+        ClimaCore.Fields.field_values(field),
+        new_space,
+    )
+end
+
 """
     read_from_hdf5(REGIRD_DIR, hd_outfile_root, time, varname,
         comms_ctx = ClimaComms.SingletonCommsContext())
@@ -77,8 +84,10 @@ function read_from_hdf5(
     hd_outfile_root,
     time,
     varname,
-    comms_ctx = ClimaComms.SingletonCommsContext(),
+    space,
 )
+    # comms_ctx = ClimaComms.context(space)
+    comms_ctx = ClimaComms.SingletonCommsContext(ClimaComms.CPUSingleThreaded())
     # Include time component in HDF5 reader name if it's a valid date
     if !(time == Dates.DateTime(0))
         hdfreader_path = joinpath(
@@ -93,7 +102,7 @@ function read_from_hdf5(
 
     field = ClimaCore.InputOutput.read_field(hdfreader, varname)
     Base.close(hdfreader)
-    return field
+    return swap_space!(field, space)
 end
 
 
