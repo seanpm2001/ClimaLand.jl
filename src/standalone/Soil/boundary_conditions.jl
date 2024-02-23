@@ -400,6 +400,7 @@ function soil_boundary_fluxes(
         Y,
         p,
         model.parameters,
+        axes(Δz)
     )
     # We do not model the energy flux from infiltration
     return @. create_soil_bc_named_tuple(
@@ -457,8 +458,9 @@ function ClimaLand.boundary_flux(
     t,
 )::ClimaCore.Fields.Field
     FT = eltype(Δz)
-    precip = FT.(bc.precip(t)) .+ FT.(ClimaCore.Fields.zeros(axes(Δz)))
-    return soil_surface_infiltration(bc.runoff, precip, Y, p, model.parameters)
+    surface_space = axes(Δz)
+    precip = FT.(bc.precip(t)) .+ ClimaCore.Fields.zeros(surface_space)
+    return soil_surface_infiltration(bc.runoff, precip, Y, p, model.parameters, surface_space)
 end
 
 """

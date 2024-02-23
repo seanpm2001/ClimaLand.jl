@@ -157,6 +157,20 @@ function horizontal_components!(
     _...,
 ) end
 
+"""
+    append_source(src::AbstractSoilSource, srcs::Tuple)::Tuple
+Appends `src` to the tuple of sources `srcs` if `src` is of type `AbstractSoilSource`.
+"""
+append_source(src::AbstractSoilSource, srcs::Tuple)::Tuple = (srcs..., src)
+
+"""
+    append_source(src::Nothing , srcs::Tuple)::Tuple
+Appends `src` to the tuple of sources `srcs` if `src` is of type `AbstractSoilSource`.
+"""
+append_source(src::Nothing, srcs::Tuple)::Tuple = srcs
+
+include("Runoff/Runoff.jl")
+using .Runoff
 include("./retention_models.jl")
 include("./runoff.jl")
 include("./rre.jl")
