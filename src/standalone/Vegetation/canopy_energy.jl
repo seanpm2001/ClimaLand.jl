@@ -92,7 +92,6 @@ function make_compute_exp_tendency(
     canopy,
 ) where {FT}
     function compute_exp_tendency!(dY, Y, p, t)
-        area_index = p.canopy.hydraulics.area_index
         ac_canopy = model.parameters.ac_canopy
         # Energy Equation:
         # (ρc_canopy h_canopy AI) ∂T∂t = -∑F
@@ -111,7 +110,7 @@ function make_compute_exp_tendency(
         # To prevent dividing by zero, change AI" to
         # "max(AI, eps(FT))"
         c_per_ground_area =
-            @. ac_canopy * max(area_index.leaf + area_index.stem, eps(FT))
+            @. ac_canopy * max(p.canopy.biomass.LAI + canopy.biomass.SAI, eps(FT))
         @. dY.canopy.energy.T = -net_energy_flux / c_per_ground_area
     end
     return compute_exp_tendency!

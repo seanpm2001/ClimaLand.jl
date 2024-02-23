@@ -24,10 +24,11 @@ $(DocStringExtensions.FIELDS)
 """
 Base.@kwdef struct FarquharParameters{
     FT <: AbstractFloat,
+    F <: Union{AbstractFloat, ClimaCore.Fields.Field},
     MECH <: AbstractPhotosynthesisMechanism,
 }
     "Vcmax at 25 °C (mol CO2/m^2/s)"
-    Vcmax25::FT
+    Vcmax25::F
     "Γstar at 25 °C (mol/mol)"
     Γstar25::FT
     "Michaelis-Menten parameter for CO2 at 25 °C (mol/mol)"
@@ -78,43 +79,24 @@ function FarquharModel{FT}(
 end
 
 ClimaLand.name(model::AbstractPhotosynthesisModel) = :photosynthesis
-ClimaLand.auxiliary_vars(model::FarquharModel) = (:An, :GPP, :Rd, :Vcmax25)
+ClimaLand.auxiliary_vars(model::FarquharModel) = (:An, :GPP, :Rd,)
 ClimaLand.auxiliary_types(model::FarquharModel{FT}) where {FT} =
-    (FT, FT, FT, FT)
+    (FT, FT, FT,)
 ClimaLand.auxiliary_domain_names(::FarquharModel) =
-    (:surface, :surface, :surface, :surface)
+    (:surface, :surface, :surface,)
 
 """
-    update_photosynthesis!(Rd, An, Vcmax25,
-        model::FarquharModel,
-        T,
-        APAR,
-        β,
-        medlyn_factor,
-        c_co2,
-        R,
-    )
+    update_photosynthesis!(model::FarquharModel, p, Y, T, earth_param_set)
 
 Computes the net photosynthesis rate `An` for the Farquhar model, along with the
-dark respiration `Rd`, and updates them in place.
+dark respiration `Rd`, and updates them in place within `p`.
 
-To do so, we require the canopy leaf temperature `T`, Medlyn factor, `APAR` in
+To do so, we require the canopy leaf temperature `T` and diagnostic
+variables available in `p`: Medlyn factor, `APAR` in
 photons per m^2 per second, CO2 concentration in the atmosphere,
-moisture stress factor `β` (unitless), and the universal gas constant
-`R`.
+moisture stress factor `β` (unitless).
 """
-function update_photosynthesis!(
-    Rd,
-    An,
-    Vcmax25field,
-    model::FarquharModel,
-    T,
-    APAR,
-    β,
-    medlyn_factor,
-    c_co2,
-    R,
-)
+function update_photosynthesis!(model::FarquharModel, p, T, earth_param_set)
     (;
         Vcmax25,
         Γstar25,
@@ -132,7 +114,12 @@ function update_photosynthesis!(
         Ko25,
         ΔHkc,
         ΔHko,
-    ) = model.parameters
+     ) = model.parameters
+    FT = eltype(model.parameters)
+    Rd = p.canopy.photosynthesis.Rd
+    An = p.canopy.photosynthesis.An
+    R = FT(LP.gas_constant(earth_param_set))
+    c_co2_air = p.drivesr.c_co2
     Jmax = max_electron_transport.(Vcmax25, ΔHJmax, T, To, R)
     J = electron_transport.(APAR, Jmax, θj, ϕ)
     Vcmax = compute_Vcmax.(Vcmax25, T, To, R, ΔHVcmax)
@@ -144,8 +131,14 @@ function update_photosynthesis!(
     Ac = rubisco_assimilation.(mechanism, Vcmax, ci, Γstar, Kc, Ko, oi)
     @. Rd = dark_respiration(Vcmax25, β, f, ΔHRd, T, To, R)
     @. An = net_photosynthesis(Ac, Aj, Rd, β)
-    Vcmax25field .= Vcmax25
 end
 Base.broadcastable(m::AbstractPhotosynthesisMechanism) = tuple(m) # this is so that @. does not broadcast on Ref(canopy.autotrophic_respiration)
+
+"""
+    return_vcmax25(model::FarquharModel, p)
+
+Helper function which returns the Vcmac25 parameter field of the Farquhar model.
+"""
+return_vcmax25(model::FarquharModel, p) = model.parameters.Vcmax25
 
 include("./optimality_farquhar.jl")

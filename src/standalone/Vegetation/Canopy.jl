@@ -28,6 +28,7 @@ export SharedCanopyParameters,
     CanopyModel, set_canopy_prescribed_field!, update_canopy_prescribed_field!
 include("./component_models.jl")
 include("./soil_drivers.jl")
+include("./biomass.jl")
 include("./PlantHydraulics.jl")
 using .PlantHydraulics
 include("./stomatalconductance.jl")
@@ -54,7 +55,7 @@ struct SharedCanopyParameters{FT <: AbstractFloat, PSE}
 end
 
 """
-     CanopyModel{FT, AR, RM, PM, SM, PHM, EM, A, R, S, PS, D} <: AbstractExpModel{FT}
+     CanopyModel{FT, AR, RM, PM, SM, PHM, EM, BM, A, R, S, PS, D} <: AbstractExpModel{FT}
 
 The model struct for the canopy, which contains
 - the canopy model domain (a point for site-level simulations, or
@@ -95,7 +96,7 @@ treated differently.
 
 $(DocStringExtensions.FIELDS)
 """
-struct CanopyModel{FT, AR, RM, PM, SM, PHM, EM, A, R, S, PS, D} <:
+struct CanopyModel{FT, AR, RM, PM, SM, PHM, EM, BM, A, R, S, PS, D} <:
        AbstractExpModel{FT}
     "Autotrophic respiration model, a canopy component model"
     autotrophic_respiration::AR
@@ -109,6 +110,8 @@ struct CanopyModel{FT, AR, RM, PM, SM, PHM, EM, A, R, S, PS, D} <:
     hydraulics::PHM
     "Energy balance model, a canopy component model"
     energy::EM
+    "Biomass model, a canopy component model"
+    biomass:BM
     "Atmospheric forcing: prescribed or coupled"
     atmos::A
     "Radiative forcing: prescribed or coupled"
@@ -128,7 +131,7 @@ end
         photosynthesis::AbstractPhotosynthesisModel{FT},
         conductance::AbstractStomatalConductanceModel{FT},
         hydraulics::AbstractPlantHydraulicsModel{FT},
-        energy::AbstractCanopyEnergyModel{FT},
+        biomass::AbstractBiomassModel{FT},
         atmos::AbstractAtmosphericDrivers{FT},
         radiation::AbstractRadiativeDrivers{FT},
         soil::AbstractSoilDriver,
@@ -152,7 +155,8 @@ function CanopyModel{FT}(;
     radiative_transfer::AbstractRadiationModel{FT},
     photosynthesis::AbstractPhotosynthesisModel{FT},
     conductance::AbstractStomatalConductanceModel{FT},
-    hydraulics::AbstractPlantHydraulicsModel{FT},
+                         hydraulics::AbstractPlantHydraulicsModel{FT},
+                         biomass::AbstractBiomassModel{FT},
     energy = PrescribedCanopyTempModel{FT}(),
     atmos::AbstractAtmosphericDrivers{FT},
     radiation::AbstractRadiativeDrivers{FT},
@@ -176,6 +180,7 @@ function CanopyModel{FT}(;
         conductance,
         hydraulics,
         energy,
+        biomass,
         atmos,
         radiation,
         soil_driver,
@@ -204,6 +209,7 @@ canopy_components(::CanopyModel) = (
     :radiative_transfer,
     :autotrophic_respiration,
     :energy,
+    :biomass,
 )
 
 """
@@ -357,24 +363,6 @@ function initialize_auxiliary(model::CanopyModel{FT}, coords) where {FT}
     return p
 end
 
-"""
-    ClimaLand.make_set_initial_cache(model::CanopyModel)
-
-Returns the set_initial_cache! function, which updates the auxiliary
-state `p` in place with the initial values corresponding to Y(t=t0) = Y0.
-
-In this case, we also use this method to update the initial values for the
-spatially and temporally varying canopy parameter fields,
-read in from data files or otherwise prescribed.
-"""
-function ClimaLand.make_set_initial_cache(model::CanopyModel)
-    update_cache! = make_update_cache(model)
-    function set_initial_cache!(p, Y0, t0)
-        set_canopy_prescribed_field!(model.hydraulics, p, t0)
-        update_cache!(p, Y0, t0)
-    end
-    return set_initial_cache!
-end
 
 """
      ClimaLand.make_update_aux(canopy::CanopyModel{FT,
@@ -408,16 +396,11 @@ function ClimaLand.make_update_aux(
         <:MedlynConductanceModel,
         <:PlantHydraulicsModel,
         <:AbstractCanopyEnergyModel,
+        <:PrescribedBiomassModel,
     },
 ) where {FT}
     function update_aux!(p, Y, t)
-        # Extend to other fields when necessary
-        # Update the prescribed fields to the current time `t`,
-        # prior to updating the rest of the auxiliary state to
-        # the current time, as they depend on prescribed fields.
-        update_canopy_prescribed_field!(canopy.hydraulics, p, t)
-
-        # Other auxiliary variables being updated:
+        # Auxiliary variables being updated:
         Ra = p.canopy.autotrophic_respiration.Ra
         APAR = p.canopy.radiative_transfer.apar
         PAR = p.canopy.radiative_transfer.par
@@ -445,7 +428,6 @@ function ClimaLand.make_update_aux(
         q_air = p.drivers.q
         h::FT = canopy.atmos.h
 
-
         # unpack parameters
         earth_param_set = canopy.parameters.earth_param_set
         c = FT(LP.light_speed(earth_param_set))
@@ -453,16 +435,19 @@ function ClimaLand.make_update_aux(
         N_a = FT(LP.avogadro_constant(earth_param_set))
         grav = FT(LP.grav(earth_param_set))
         ρ_l = FT(LP.ρ_cloud_liq(earth_param_set))
-        R = FT(LP.gas_constant(earth_param_set))
         thermo_params = earth_param_set.thermo_params
         (; ld, Ω, λ_γ_PAR, λ_γ_NIR) = canopy.radiative_transfer.parameters
         energy_per_photon_PAR = planck_h * c / λ_γ_PAR
         energy_per_photon_NIR = planck_h * c / λ_γ_NIR
         (; g1, g0, Drel) = canopy.conductance.parameters
-        area_index = p.canopy.hydraulics.area_index
-        LAI = area_index.leaf
-        RAI = area_index.root
         (; sc, pc) = canopy.photosynthesis.parameters
+
+        # update biomass - must come first
+        update_area_indices!(canopy.biomass, p, t)
+        area_index = p.canopy.biomass.area_index
+        LAI = p.canopy.biomass.LAI
+        SAI = p.canopy.biomass.SAI
+        RAI = p.canopy.biomass.RAI
 
         # update radiative transfer
         RT = canopy.radiative_transfer
@@ -509,7 +494,6 @@ function ClimaLand.make_update_aux(
         hydraulics = canopy.hydraulics
         n_stem = hydraulics.n_stem
         n_leaf = hydraulics.n_leaf
-        PlantHydraulics.lai_consistency_check.(n_stem, n_leaf, area_index)
         (; retention_model, conductivity_model, S_s, ν) = hydraulics.parameters
         # We can index into a field of Tuple{FT} to extract a field of FT
         # using the following notation: field.:index
@@ -534,9 +518,8 @@ function ClimaLand.make_update_aux(
                 S_s,
             )
 
-            areai = getproperty(area_index, hydraulics.compartment_labels[i])
-            areaip1 =
-                getproperty(area_index, hydraulics.compartment_labels[ip1])
+            areai = area_index(model.compartment_labels[i], canopy.biomass, p)
+            areaip1 = area_index(model.compartment_labels[ip1], canopy.biomass, p)
 
             # Compute the flux*area between the current compartment `i`
             # and the compartment above.
@@ -569,23 +552,13 @@ function ClimaLand.make_update_aux(
         @. β = moisture_stress(ψ.:($$i_end) * ρ_l * grav, sc, pc)
 
         # Update Rd, An, Vcmax25 (if applicable to model) in place
-        Vcmax25 = p.canopy.photosynthesis.Vcmax25
-        update_photosynthesis!(
-            Rd,
-            An,
-            Vcmax25,
-            canopy.photosynthesis,
-            T_canopy,
-            APAR,
-            β,
-            medlyn_factor,
-            c_co2_air,
-            R,
-        )
+        update_photosynthesis!(canopy.photosynthesis, p, T_canopy, earth_param_set)
+
         @. GPP = compute_GPP(An, K, LAI, Ω)
         @. gs = medlyn_conductance(g0, Drel, medlyn_factor, An, c_co2_air)
         # update autotrophic respiration
         h_canopy = hydraulics.compartment_surfaces[end]
+        Vcmax25 = return_vcmax25(canopy.photosynthesis, p)
         @. Ra = compute_autrophic_respiration(
             canopy.autotrophic_respiration,
             Vcmax25,

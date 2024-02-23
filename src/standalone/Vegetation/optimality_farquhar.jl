@@ -79,36 +79,16 @@ ClimaLand.auxiliary_domain_names(::OptimalityFarquharModel) =
     (:surface, :surface, :surface, :surface)
 
 """
-    update_photosynthesis!(Rd, An, Vcmax25,
-        model::OptimalityFarquharModel,
-        T,
-        APAR,
-        β,
-        medlyn_factor,
-        c_co2,
-        R,
-    )
+   update_photosynthesis!(model::OptimalityFarquharModel, p, T_canopy, earth_param_set)
 
 Computes the net photosynthesis rate `An` for the Optimality Farquhar model, along with the
-dark respiration `Rd`, and the value of `Vcmax25`, and updates them in place.
+dark respiration `Rd`, and the value of `Vcmax25`, and updates them in place in `p`.
         
- To do so, we require the canopy leaf temperature `T`, Medlyn factor, `APAR` in
+ To do so, we require the canopy leaf temperature `T_canopy`, as well as other diagnostic parameters stored in`p`:  Medlyn factor, `APAR` in
 photons per m^2 per second, CO2 concentration in the atmosphere,
-moisture stress factor `β` (unitless), and the universal gas constant
-`R`.
+moisture stress factor `β` (unitless).
 """
-function update_photosynthesis!(
-    Rd,
-    An,
-    Vcmax25,
-    model::OptimalityFarquharModel,
-    T,
-    APAR,
-    β,
-    medlyn_factor,
-    c_co2,
-    R,
-)
+function update_photosynthesis!(model::OptimalityFarquharModel, p, T, earth_param_set)
     (;
         Γstar25,
         ΔHVcmax,
@@ -126,7 +106,11 @@ function update_photosynthesis!(
         ΔHko,
         c,
     ) = model.parameters
-
+    FT = eltype(model.parameters)
+    Rd = p.canopy.photosynthesis.Rd
+    An = p.canopy.photosynthesis.An
+    R = FT(LP.gas_constant(earth_param_set))
+    c_co2_air = p.drivesr.c_co2
     Γstar = co2_compensation.(Γstar25, ΔHΓstar, T, To, R)
     ci = intercellular_co2.(c_co2, Γstar, medlyn_factor)# may change?
     Kc = MM_Kc.(Kc25, ΔHkc, T, To, R)
@@ -153,3 +137,10 @@ function update_photosynthesis!(
     @. Rd = dark_respiration(Vcmax25, β, f, ΔHRd, T, To, R)
     @. An = net_photosynthesis(Ac, Aj, Rd, β)
 end
+
+"""
+    return_vcmax25(model::OptimalityFarquharModel, p)
+
+Helper function which returns the Vcmac25 field of the OptimalityFarquhar model.
+"""
+return_vcmax25(model::OptimalityFarquharModel, p) = p.photosynthesis.Vcmax25

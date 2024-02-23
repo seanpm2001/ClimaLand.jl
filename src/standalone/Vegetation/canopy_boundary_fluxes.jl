@@ -44,7 +44,7 @@ function ClimaLand.surface_resistance(
     canopy_conductance =
         upscale_leaf_conductance.(
             leaf_conductance,
-            p.canopy.hydraulics.area_index.leaf,
+            p.canopy.biomass.LAI,
             T_air,
             R,
             P_air,
