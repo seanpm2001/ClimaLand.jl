@@ -28,8 +28,6 @@ export PlantHydraulicsModel,
     inverse_water_retention_curve,
     root_water_flux_per_ground_area!,
     PlantHydraulicsParameters,
-    PrescribedTranspiration,
-    DiagnosticTranspiration,
     AbstractConductivityModel,
     AbstractRetentionModel,
     LinearRetentionCurve,
@@ -45,14 +43,6 @@ An abstract type for plant hydraulics models.
 abstract type AbstractPlantHydraulicsModel{FT} <: AbstractCanopyComponent{FT} end
 
 ClimaLand.name(::AbstractPlantHydraulicsModel) = :hydraulics
-
-"""
-    AbstractTranspiration{FT <: AbstractFloat}
-
-An abstract type for types representing different models of
-transpiration (Prescribed or Diagnostic)
-"""
-abstract type AbstractTranspiration{FT <: AbstractFloat} end
 
 """
    PrescribedSiteAreaIndex{FT <:AbstractFloat, F <: Function}
@@ -196,8 +186,7 @@ emission, zero transpiration and sensible heat flux from the canopy), by setting
 A plant model can have leaves but no stem, but not vice versa. If n_stem = 0, SAI must be zero.
 
 Finally, the model can be used in Canopy standalone mode by prescribing
-the soil matric potential at the root tips or flux in the roots. There is also the
-option (intendend only for debugging) to use a prescribed transpiration rate.
+the soil matric potential at the root tips or flux in the roots.
 
 $(DocStringExtensions.FIELDS)
 """
@@ -215,8 +204,6 @@ struct PlantHydraulicsModel{FT, PS, T, AA <: AbstractArray{FT}} <:
     compartment_labels::Vector{Symbol}
     "Parameters required by the Plant Hydraulics model"
     parameters::PS
-    "The transpiration model, of type `AbstractTranspiration`"
-    transpiration::T
 end
 
 function PlantHydraulicsModel{FT}(;
@@ -225,9 +212,8 @@ function PlantHydraulicsModel{FT}(;
     compartment_midpoints::Vector{FT},
     compartment_surfaces::Vector{FT},
     parameters::PlantHydraulicsParameters{FT},
-    transpiration::AbstractTranspiration{FT} = DiagnosticTranspiration{FT}(),
 ) where {FT}
-    args = (parameters, transpiration)
+
     @assert (n_leaf + n_stem) == length(compartment_midpoints)
     @assert (n_leaf + n_stem) + 1 == length(compartment_surfaces)
     for i in 1:length(compartment_midpoints)
@@ -245,7 +231,7 @@ function PlantHydraulicsModel{FT}(;
     end
     return PlantHydraulicsModel{
         FT,
-        typeof.(args)...,
+        typeof(parameters),
         typeof(compartment_midpoints),
     }(
         n_stem,
@@ -253,7 +239,7 @@ function PlantHydraulicsModel{FT}(;
         compartment_midpoints,
         compartment_surfaces,
         compartment_labels,
-        args...,
+        parameters,
     )
 end
 
@@ -654,71 +640,6 @@ function root_water_flux_per_ground_area!(
                 (area_index.root + above_ground_area_index) / 2
         end
     end
-end
-
-"""
-    PrescribedTranspiration{FT, F <: Function} <: AbstractTranspiration{FT}
-
-A concrete type used for dispatch when computing the transpiration
-from the leaves, in the case where transpiration is prescribed.
-"""
-struct PrescribedTranspiration{FT, F <: Function} <: AbstractTranspiration{FT}
-    T::F
-end
-
-function PrescribedTranspiration{FT}(T::Function) where {FT <: AbstractFloat}
-    return PrescribedTranspiration{FT, typeof(T)}(T)
-end
-
-"""
-    transpiration_per_ground_area(
-        transpiration::PrescribedTranspiration{FT},
-        Y,
-        p,
-        t,
-    )::FT where {FT}
-
-A method which computes the transpiration in meters/sec between the leaf
-and the atmosphere,
-in the case of a standalone plant hydraulics model with prescribed
-transpiration rate.
-
-Transpiration should be per unit ground area, not per leaf area.
-"""
-function transpiration_per_ground_area(
-    transpiration::PrescribedTranspiration{FT},
-    _,
-    _,
-    t,
-)::FT where {FT}
-    return FT(transpiration.T(t)) # (m/s)
-end
-
-"""
-    DiagnosticTranspiration{FT} <: AbstractTranspiration{FT}
-
-A concrete type used for dispatch in the case where transpiration is computed
-diagnostically, as a function of prognostic variables and parameters,
-and stored in `p` during the `update_aux!` step.
-"""
-struct DiagnosticTranspiration{FT} <: AbstractTranspiration{FT} end
-
-"""
-    transpiration_per_ground_area(transpiration::DiagnosticTranspiration, Y, p, t)
-
-Returns the transpiration computed diagnostically using local conditions.
-In this case, it just returns the value which was computed and stored in
-the `aux` state during the update_aux! step.
-
-Transpiration should be per unit ground area, not per leaf area.
-"""
-function transpiration_per_ground_area(
-    transpiration::DiagnosticTranspiration,
-    Y,
-    p,
-    t,
-)
-    @inbounds return p.canopy.conductance.transpiration
 end
 
 end

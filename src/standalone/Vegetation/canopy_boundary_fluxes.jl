@@ -127,7 +127,6 @@ within the explicit tendency of the canopy model.
 - `p.canopy.energy.shf`: Canopy SHF
 - `p.canopy.energy.lhf`: Canopy LHF
 - `p.canopy.hydraulics.fa[end]`: Transpiration
-- `p.canopy.conductance.transpiration`: Transpiration (stored twice; to be addressed in a future PR)
 - `p.canopy.hydraulics.fa_roots`: Root water flux
 - `p.canopy.radiative_transfer.LW_n`: net long wave radiation
 - `p.canopy.radiative_transfer.SW_n`: net short wave radiation
@@ -153,7 +152,6 @@ function canopy_boundary_fluxes!(
     root_water_flux = p.canopy.hydraulics.fa_roots
     root_energy_flux = p.canopy.energy.fa_energy_roots
     fa = p.canopy.hydraulics.fa
-    transpiration = p.canopy.conductance.transpiration
     shf = p.canopy.energy.shf
     lhf = p.canopy.energy.lhf
     r_ae = p.canopy.energy.r_ae
@@ -161,18 +159,13 @@ function canopy_boundary_fluxes!(
 
     # Compute transpiration, SHF, LHF
     canopy_turbulent_fluxes = turbulent_fluxes(atmos, canopy, Y, p, t)
-    transpiration .= canopy_turbulent_fluxes.vapor_flux
     shf .= canopy_turbulent_fluxes.shf
     lhf .= canopy_turbulent_fluxes.lhf
     r_ae .= canopy_turbulent_fluxes.r_ae
 
     # Transpiration is per unit ground area, not leaf area (mult by LAI)
-    fa.:($i_end) .= PlantHydraulics.transpiration_per_ground_area(
-        canopy.hydraulics.transpiration,
-        Y,
-        p,
-        t,
-    )
+    fa.:($i_end) .= canopy_turbulent_fluxes.vapor_flux
+
     # Update the root flux of water per unit ground area in place
     root_water_flux_per_ground_area!(
         root_water_flux,
