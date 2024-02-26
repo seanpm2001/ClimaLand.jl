@@ -1,9 +1,9 @@
 module Runoff
-using ClimaLSM
-using ClimaLSM.Regridder: regrid_netcdf_to_field
-import ClimaLSM: source!
-using ..ClimaLSM.Soil: AbstractSoilSource, AbstractSoilModel
-import ..ClimaLSM.Soil: set_initial_parameter_field!
+using ClimaCore.Operators: column_integral_definite!
+using ClimaCore.Fields: Field
+using ClimaLand
+import ClimaLand: source!
+using ..ClimaLand.Soil: AbstractSoilSource, AbstractSoilModel
 export soil_surface_infiltration,
     TOPMODELRunoff,
     AbstractRunoffModel,
@@ -14,12 +14,12 @@ export soil_surface_infiltration,
     AbstractRunoffModel
 The abstract type for soil runoff models to be used with
 the following boundary condition types:
-- `ClimaLSM.Soil.AtmosDrivenFluxBC`
-- `ClimaLSM.Soil.RichardsAtmosDrivenFluxBC`,
+- `ClimaLand.Soil.AtmosDrivenFluxBC`
+- `ClimaLand.Soil.RichardsAtmosDrivenFluxBC`,
 and for these functions:
--`ClimaLSM.Soil.soil_surface_infiltration`
-- `ClimaLSM.Soil.subsurface_runoff_source`
-- `ClimaLSM.source!`.
+-`ClimaLand.Soil.soil_surface_infiltration`
+- `ClimaLand.Soil.subsurface_runoff_source`
+- `ClimaLand.source!`.
 Please see the documentation for these for more details.
 The model should specify the subsurface runoff sink term as well
 as the surface runoff implementation.
@@ -35,14 +35,13 @@ effects of runoff.
 struct NoRunoff <: AbstractRunoffModel end
 
 """
-    soil_surface_infiltration(::NoRunoff, net_water_flux, _...)
+    soil_surface_infiltration(::NoRunoff, precip, _...)
 A function which computes the infiltration into the soil
  for the default of `NoRunoff`.
-If `net_water_flux = P+E`, where `P` is the precipitation and `E`
-is the evaporation (both negative if towards the soil), 
-this returns `P+E` as the water boundary flux for the soil.
+
+Returns the precipitation.
 """
-soil_surface_infiltration(::NoRunoff, net_water_flux, _...) = net_water_flux
+soil_surface_infiltration(::NoRunoff, precip, _...) = precip
 
 """
     subsurface_runoff_source(runoff::AbstractRunoffModel)::Union{Nothing, AbstractSoilSource} 
@@ -59,7 +58,7 @@ struct TOPMODELSubsurfaceRunoff{FT} <: AbstractSoilSource{FT}
     R_sb::FT
 end
 
-struct TOPMODELRunoff{FT <: AbstractFloat} <: AbstractRunoffModel
+struct TOPMODELRunoff{FT <: AbstractFloat, F <: Field} <: AbstractRunoffModel
     f_over::FT
     f_max::F
     subsurface_source::TOPMODELSubsurfaceRunoff{FT}
@@ -69,28 +68,35 @@ end
 TOPMODEL infiltration
 """
 function soil_surface_infiltration(
-    runoffmodel::TOPMODELRunoff,
-    net_water_flux,
+    runoff::TOPMODELRunoff,
+    precip,
     Y,
     p,
-    soil_parameters,
-    surface_space
+    surface_space,
+    model::AbstractSoilModel,
 )
 
     # we need this at the surface only
     surface_space = axes(Δz_top)
-    infiltration_capacity = get_top_surface_field(-soil_parameters.K_sat, surface_space)
-    z∇ = sum(ClimaCore.Fields.ones(axes(Y.soil.ϑ_l))) - sum(heaviside.(Y.soil.ϑ_l .- ν .-0.001))
-    # net_water_flux is negative if towards the soil; take smaller in magnitude -> max
-    # net_water_flux is positive if away from soil -> use as BC.
-    return @. (1 - runoffmodel.f_max*exp(-1/2*runoffmodel.f_over*z∇)) * max(infiltration_capacity, net_water_flux)
-    # check limit - should be zero if z∇ is equal to soil depth!
+    (; hydrology_cm, K_sat, ν, θ_r) = model.parameters
+    K_eff = p.soil.K ./  ClimaLand.Soil.hydraulic_conductivity(
+                hydrology_cm,
+                K_sat,
+                effective_saturation(ν, Y.soil.ϑ_l, θ_r),
+            )
+    infiltration_capacity = get_top_surface_field(-K_eff, surface_space)
+    #needs to be by column
+    h∇ = ClimaCore.Fields.zeros(surface_space)
+    water_content = Y.soil.ϑ_l .+ Y.soil.θ_i
+    column_integral_definite!(h∇, heaviside.(water_content .- ν .-0.001))# water table thickness
+    fsat = @. runoff.f_max*exp(-1/2*runoff.f_over*(model.domain.depth - h∇)).*heaviside(h∇) # only apply where there is a water table
+    return @. (1 - fsat) * max(infiltration_capacity, precip)
 end
 
 """
-    TOPMODEL sink term for baseflow - standin
+    TOPMODEL sink term for baseflow
 """
-function ClimaLSM.source!(
+function ClimaLand.source!(
     dY,
     src::TOPMODELSubsurfaceRunoff,
     Y,
@@ -98,9 +104,11 @@ function ClimaLSM.source!(
     model::AbstractSoilModel,
 )
     ν = model.parameters.ν
-    h∇ = sum(heaviside.(Y.soil.ϑ_l .- ν .-0.001))# water table thickness
-    z∇ = model.domain.depth - h∇
-    @. dY.soil.ϑ_l -= src.R_sb * exp(-f_over*z∇) / h∇ * heaviside.(Y.soil.ϑ_l .- ν- 0.001) # apply only to saturated layers
+    #needs to be by column
+    h∇ = ClimaCore.Fields.zeros(surface_space)
+    water_content = Y.soil.ϑ_l .+ Y.soil.θ_i
+    h∇ = column_integral_definite!(h∇, sum(heaviside.(water_content .- ν .-0.001)))# water table thickness
+    @. dY.soil.ϑ_l -= src.R_sb * exp(-f_over*(model.domain.depth - h∇)) / h∇ * heaviside.(water_content .- ν- 0.001) # apply only to saturated layers
 
 end
 

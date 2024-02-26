@@ -396,15 +396,14 @@ function soil_boundary_fluxes(
     precip = p.drivers.P_liq
     infiltration = soil_surface_infiltration(
         bc.runoff,
-        precip .+ p.soil.turbulent_fluxes.vapor_flux,
+        precip,
         Y,
         p,
-        model.parameters,
-        axes(Δz)
+        model
     )
     # We do not model the energy flux from infiltration
     return @. create_soil_bc_named_tuple(
-        infiltration,
+        infiltration .+ p.soil.turbulent_fluxes.vapor_flux ,
         p.soil.R_n + p.soil.turbulent_fluxes.lhf + p.soil.turbulent_fluxes.shf,
     )
 end
@@ -460,7 +459,7 @@ function ClimaLand.boundary_flux(
     FT = eltype(Δz)
     surface_space = axes(Δz)
     precip = FT.(bc.precip(t)) .+ ClimaCore.Fields.zeros(surface_space)
-    return soil_surface_infiltration(bc.runoff, precip, Y, p, model.parameters, surface_space)
+    return soil_surface_infiltration(bc.runoff, precip, Y, p, model)
 end
 
 """
