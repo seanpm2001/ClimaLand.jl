@@ -480,3 +480,15 @@ function ClimaLand.make_update_jacobian(model::RichardsModel{FT}) where {FT}
     end
     return update_jacobian!
 end
+
+function ClimaLand.get_drivers(model::RichardsModel)
+    bc = model.boundary_conditions.top
+    if typeof(bc) <: RichardsAtmosDrivenFluxBC{
+        <:PrescribedPrecipitation,
+        <:AbstractRunoffModel,
+    }
+        return (bc.precip, nothing)
+    else
+        return (nothing, nothing)
+    end
+end

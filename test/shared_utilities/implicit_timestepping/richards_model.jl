@@ -36,7 +36,7 @@ for FT in (Float32, Float64)
         bot_flux_bc = FreeDrainage()
         sources = ()
         boundary_states =
-            (; top = (water = top_state_bc,), bottom = (water = bot_flux_bc,))
+            (; top = top_state_bc, bottom = bot_flux_bc)
         params = Soil.RichardsParameters(ν, hcm, K_sat, S_s, θ_r)
 
         for domain in soil_domains
@@ -147,7 +147,7 @@ for FT in (Float32, Float64)
         bot_flux_bc = FreeDrainage()
         sources = ()
         boundary_states =
-            (; top = (water = top_flux_bc,), bottom = (water = bot_flux_bc,))
+            (; top = top_flux_bc, bottom = bot_flux_bc)
         params = Soil.RichardsParameters(ν, hcm, K_sat, S_s, θ_r)
         for domain in soil_domains
             soil = Soil.RichardsModel{FT}(;

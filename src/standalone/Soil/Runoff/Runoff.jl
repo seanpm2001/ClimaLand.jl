@@ -5,6 +5,7 @@ import ClimaLand: source!
 using ..ClimaLand.Soil: AbstractSoilSource, AbstractSoilModel, RichardsModel, EnergyHydrology
 export soil_surface_infiltration,
     TOPMODELRunoff,
+    NoRunoff,
     AbstractRunoffModel,
     TOPMODELSubsurfaceRunoff,
     subsurface_runoff_source,

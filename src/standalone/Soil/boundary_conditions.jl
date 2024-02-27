@@ -1,6 +1,5 @@
 import ClimaLand: AbstractBC, AbstractBoundary, boundary_flux
 using ClimaCore.Operators: column_integral_definite!
-using ClimaLand: AbstractTimeVaryingInput
 
 export TemperatureStateBC,
     MoistureStateBC,
@@ -88,54 +87,62 @@ abstract type AbstractSoilBC <: ClimaLand.AbstractBC end
 
 
 """
-    boundary_vars(::NamedTuple, ::ClimaLand.TopBoundary)
+    boundary_vars(::Union{NamedTuple, AbstractSoilBC}, ::ClimaLand.TopBoundary)
 
 The list of symbols for additional variables to add to the soil
-model auxiliary state, which defaults to adding storage for the
- top boundary flux fields,
-but which can be extended depending on the type of boundary condition used.
+model auxiliary state which dispatches off of the type of the boundary condition,
+and which defaults to adding storage for the
+ top boundary flux fields.
 
-Note that `:top_bc` must be present, with the default type and domain name,
-for both the RichardsModel and the 
-EnergyHydrology soil models.
+In the RichardsModel case, the top boundary is of type AbstractSoilBC. In the
+EnergyHydrology case, the top boundary is a NamedTuple, with values of type
+AbstractSoilBC (and keys of :water and :heat). In both case, we add
+the field :top_bc to the cache `p`. In the former case, it will be a scalar type,
+and in the latter, it will be a NamedTuple type.
 
- Use this function in the exact same way you would use `auxiliary_vars`.
-"""
-boundary_vars(::NamedTuple, ::ClimaLand.TopBoundary) = (:top_bc,)
-boundary_vars(::AbstractSoilBC, ::ClimaLand.TopBoundary) =
-    (:top_bc,)
-"""
-    boundary_vars(::NamedTuple, ::ClimaLand.BottomBoundary)
-
-The list of symbols for additional variables to add to the soil
-model auxiliary state, which defaults to adding storage for the
- bottom boundary flux fields,
-but which can be extended depending on the type of boundary condition used.
+Note that `:top_bc` must be present, with the types described above, for all additional
+methods you define.
 
 Use this function in the exact same way you would use `auxiliary_vars`.
-
-Note that `:bottom_bc` must be present, with the default type and domain name,
-for both the RichardsModel and the 
-EnergyHydrology soil models.
 """
-boundary_vars(::NamedTuple, ::ClimaLand.BottomBoundary) = (:bottom_bc,)
-boundary_vars(::AbstractSoilBC, ::ClimaLand.BottomBoundary) =
-    (:bottom_bc,)
-"""
-    boundary_var_domain_names(::AbstractSoilBC, ::ClimaLand.AbstractBoundary)
+boundary_vars(::Union{NamedTuple, AbstractSoilBC}, ::ClimaLand.TopBoundary) = (:top_bc,)
 
-The list of domain names for additional variables to add to the soil
-model auxiliary state,  which defaults to adding storage for the
- boundary flux fields,
-but which can be extended depending on the type of boundary condition used.
-Note that extensions to this function must still include a flux bc defined on
-the surface in addition to other variables.
-
-Use this function in the exact same way you would use `auxiliary_var_domain_names`.
 """
-boundary_var_domain_names(::NamedTuple, ::ClimaLand.AbstractBoundary) =
-    (:surface,)
-boundary_var_domain_names(::AbstractSoilBC, ::ClimaLand.AbstractBoundary) =
+    boundary_vars(::Union{NamedTuple, AbstractSoilBC}, ::ClimaLand.BottomBoundary)
+
+The list of symbols for additional variables to add to the soil
+model auxiliary state which dispatches off of the type of the boundary condition,
+and which defaults to adding storage for the
+ bottom boundary flux fields.
+
+In the RichardsModel case, the bottom boundary is of type AbstractSoilBC. In the
+EnergyHydrology case, the bottom boundary is a NamedTuple, with values of type
+AbstractSoilBC (and keys of :water and :heat). In both case, we add
+the field :bottom_bc to the cache `p`. In the former case, it will be a scalar type,
+and in the latter, it will be a NamedTuple type.
+
+Note that `:bottom_bc` must be present, with the types described above, for all additional
+methods you define.
+
+Use this function in the exact same way you would use `auxiliary_vars`.
+"""
+boundary_vars(::Union{NamedTuple, AbstractSoilBC}, ::ClimaLand.BottomBoundary) = (:bottom_bc,)
+
+"""
+    boundary_var_domain_names(::Union{NamedTuple, AbstractSoilBC}, ::ClimaLand.AbstractBoundary)
+
+The list of domain names for additional variables added to the soil
+model auxiliary state, which dispatches off of the type of the boundary condition,
+and which defaults to adding storage for the
+ boundary flux field.
+
+
+Note that extensions to this function must always include a variable equivalent to
+the boundary flux.
+
+Use this function in the exact same way you would use `auxiliary_domain_names`.
+"""
+boundary_var_domain_names(::Union{NamedTuple, AbstractSoilBC}, ::ClimaLand.AbstractBoundary) =
     (:surface,)
 
 """
@@ -159,7 +166,7 @@ function boundary_var_types(
 end
 
 """
-    boundary_var_types(::Soil.RichardsModel{FT}, ::NamedTuple, ::ClimaLand.AbstractBoundary) where {FT}
+    boundary_var_types(::Soil.RichardsModel{FT}, ::AbstractSoilBC, ::ClimaLand.AbstractBoundary) where {FT}
 
 The list of variable types for additional variables to add to the Richards
 model auxiliary state,  which defaults to adding storage for the
@@ -177,7 +184,7 @@ boundary_var_types(
     ::Soil.RichardsModel{FT},
     ::AbstractSoilBC,
     ::ClimaLand.AbstractBoundary,
-) where {FT} = (FT,)#NamedTuple{(:water,), Tuple{FT}},)
+) where {FT} = (FT,)
 
 
 """
@@ -235,7 +242,7 @@ If you wish to simulate precipitation and runoff in the full `EnergyHydrology` m
 you must use the `AtmosDrivenFluxBC` type.
 $(DocStringExtensions.FIELDS)
 """
-struct RichardsAtmosDrivenFluxBC{F <: AbstractTimeVaryingInput, R <: AbstractRunoffModel} <:
+struct RichardsAtmosDrivenFluxBC{F <: PrescribedPrecipitation, R <: AbstractRunoffModel} <:
        AbstractSoilBC
     "The prescribed liquid water precipitation rate f(t) (m/s); Negative by convention."
     precip::F
@@ -243,7 +250,7 @@ struct RichardsAtmosDrivenFluxBC{F <: AbstractTimeVaryingInput, R <: AbstractRun
     runoff::R
 end
 
-function RichardsAtmosDrivenFluxBC(precip::AbstractTimeVaryingInput; runoff = NoRunoff())
+function RichardsAtmosDrivenFluxBC(precip::PrescribedPrecipitation; runoff = NoRunoff())
     return RichardsAtmosDrivenFluxBC{typeof(precip), typeof(runoff)}(
         precip,
         runoff,
@@ -251,7 +258,7 @@ function RichardsAtmosDrivenFluxBC(precip::AbstractTimeVaryingInput; runoff = No
 end
 
 """
-    boundary_vars(::RichardsAtmosDrivenFluxBC{<:AbstractTimeVaryingInput,
+    boundary_vars(::RichardsAtmosDrivenFluxBC{<:PrescribedPrecipitation,
                                               <:Runoff.TOPMODELRunoff,
                                               }, ::ClimaLand.TopBoundary)
 
@@ -260,14 +267,14 @@ TOPMODELRunoff.
 
 These variables are updated in place in `boundary_flux`.
 """
-boundary_vars(bc::RichardsAtmosDrivenFluxBC{<:AbstractTimeVaryingInput,
+boundary_vars(bc::RichardsAtmosDrivenFluxBC{<:PrescribedPrecipitation,
                                             <:Runoff.TOPMODELRunoff,
                                             },
               ::ClimaLand.TopBoundary) =
                   (:top_bc,:h∇, :R_s, :R_ss)
 
 """
-    boundary_var_domain_names(::RichardsAtmosDrivenFluxBC{<:AbstractTimeVaryingInput,
+    boundary_var_domain_names(::RichardsAtmosDrivenFluxBC{<:PrescribedPrecipitation,
                                               <:Runoff.TOPMODELRunoff,
                                               },
                               ::ClimaLand.TopBoundary)
@@ -275,13 +282,13 @@ boundary_vars(bc::RichardsAtmosDrivenFluxBC{<:AbstractTimeVaryingInput,
 An extension of the `boundary_var_domain_names` method for RichardsAtmosDrivenFluxBC
 with TOPMODELRunoff. 
 """
-boundary_var_domain_names(bc::RichardsAtmosDrivenFluxBC{<:AbstractTimeVaryingInput,
+boundary_var_domain_names(bc::RichardsAtmosDrivenFluxBC{<:PrescribedPrecipitation,
                                               <:Runoff.TOPMODELRunoff,
                                                         },
                           ::ClimaLand.TopBoundary) =
                               (:surface, :surface, :surface, :surface)
 """
-    boundary_var_types(::RichardsAtmosDrivenFluxBC{<:AbstractTimeVaryingInput,
+    boundary_var_types(::RichardsAtmosDrivenFluxBC{<:PrescribedPrecipitation,
                                                    <:Runoff.TOPMODELRunoff{FT},
                                                   },
                        ::ClimaLand.TopBoundary,
@@ -292,12 +299,12 @@ with TOPMODELRunoff.
 """
 boundary_var_types(
     model::RichardsModel{FT},
-    bc::RichardsAtmosDrivenFluxBC{<:AbstractTimeVaryingInput,
+    bc::RichardsAtmosDrivenFluxBC{<:PrescribedPrecipitation,
                                   <:Runoff.TOPMODELRunoff{FT},
                                   },
     ::ClimaLand.TopBoundary,
 ) where {FT} = (
-    FT,#NamedTuple{(:water,), Tuple{FT}},
+    FT,
     FT,
     FT,
     FT
@@ -661,8 +668,7 @@ function ClimaLand.boundary_flux(
     FT = eltype(Δz)
     runoff = bc.runoff
     surface_space = axes(Δz)
-    precip = ClimaCore.Fields.zeros(surface_space)
-    evaluate!(precip, bc.precip, t)
+    precip = p.drivers.P_liq
     # need to update to compute runoff
     column_integral_definite!(p.soil.h∇, ClimaLand.heaviside.(Y.soil.ϑ_l  .- model.parameters.ν))
     @. p.soil.R_ss = topmodel_ss_flux(runoff.subsurface_source.R_sb, runoff.f_over, model.domain.depth - p.soil.h∇)

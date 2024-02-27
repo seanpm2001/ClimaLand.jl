@@ -88,7 +88,7 @@ for FT in (Float32, Float64)
     flux_out = FT(0)
     bot_bc = Soil.FluxBC((p, t) -> flux_out)
 
-    boundary_fluxes = (; top = (water = top_bc,), bottom = (water = bot_bc,))
+    boundary_fluxes = (; top = top_bc, bottom =bot_bc)
 
     soil = Soil.RichardsModel{FT}(;
         parameters = params,
@@ -199,7 +199,7 @@ for FT in (Float32, Float64)
     flux_out = FT(0)
     bot_flux_bc = Soil.FluxBC((p, t) -> flux_out)
     boundary_conds =
-        (; top = (water = top_state_bc,), bottom = (water = bot_flux_bc,))
+        (; top = top_state_bc, bottom =  bot_flux_bc)
 
     soil_dirichlet = Soil.RichardsModel{FT}(;
         parameters = params,

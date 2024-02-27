@@ -52,8 +52,10 @@ end
     end
         
     precip = ClimaLand.TimeVaryingInput(precip_function)
+    atmos = ClimaLand.PrescribedPrecipitation{FT, typeof(precip)}(precip)
+
     noflux = ClimaLand.Soil.FluxBC((p,t) -> 0.0)
-    bc = (; top = ClimaLand.Soil.RichardsAtmosDrivenFluxBC(precip, runoff_model), bottom =  noflux)
+    bc = (; top = ClimaLand.Soil.RichardsAtmosDrivenFluxBC(atmos, runoff_model), bottom =  noflux)
     model = ClimaLand.Soil.RichardsModel{FT}(; parameters = soil_params, domain = domain,
                               boundary_conditions = bc, sources = ())
     Y,p,t = initialize(model)

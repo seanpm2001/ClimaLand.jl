@@ -43,10 +43,17 @@ function main(; resolution)
 
         end
     end
-    ds = NCDataset("means_$resolution.nc", "c")
+    ds = NCDataset("means_ll_$resolution.nc", "c")
     defDim(ds, "lon", lon_count)
     defDim(ds, "lat", lat_count)
     ds.attrib["title"] = "Topographic Index Data"
+
+    la = defVar(ds, "lat", Float32, ("lat",))
+    la[:] = (0.5:1:lat_count-0.5)./lat_count .*(lat_max - lat_min) .+ lat_min
+    
+    lo = defVar(ds, "lon", Float32, ("lon",))
+    lo[:] = (0.5:1:lon_count-0.5)./lon_count .*(lon_max - lon_min) .+ lon_min
+    
     mean_ϕ = defVar(ds, "ϕ_mean", Float32, ("lat", "lon"))
     mean_ϕ[:, :] = parameters[:, :, 2]
     f0 = defVar(ds, "fraction_zero", Float32, ("lat", "lon"))
@@ -59,6 +66,10 @@ function main(; resolution)
     f0.attrib["units"] = "unitless"
     fmax.attrib["units"] = "unitless"
     mask.attrib["units"] = "unitless"
+    la.attrib["units"] = "degrees_north"
+    la.attrib["standard_name"] = "latitude"
+    lo.attrib["standard_name"] = "longitude"
+    lo.attrib["units"] = "degrees_east"
     mean_ϕ.attrib["comments"] = "The mean topographic index"
     fmax.attrib["comments"] = "The maximum saturated fraction from TOPMODEL"
     f0.attrib["comments"] = "The fraction of zero values in cell"

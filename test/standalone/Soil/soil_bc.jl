@@ -283,7 +283,7 @@ end
 
 
     boundary_fluxes =
-        (; top = (water = top_flux_bc,), bottom = (water = bot_flux_bc,))
+        (; top = top_flux_bc, bottom = bot_flux_bc)
 
     parameters = Soil.RichardsParameters(;
         ν = ν,
@@ -292,7 +292,9 @@ end
         S_s = S_s,
         θ_r = θ_r,
     )
-    bc = boundary_fluxes
+    bc = (;
+          top =  top_flux_bc,
+          bottom  = bot_flux_bc)
     rre = Soil.RichardsModel{FT}(;
         parameters = parameters,
         domain = soil_domain,
@@ -300,26 +302,26 @@ end
         sources = sources,
     )
 
-    @test Soil.boundary_vars(bc, ClimaLand.TopBoundary()) == (:top_bc,)
-    @test Soil.boundary_var_domain_names(bc, ClimaLand.TopBoundary()) ==
+    @test Soil.boundary_vars(bc.top, ClimaLand.TopBoundary()) == (:top_bc,)
+    @test Soil.boundary_var_domain_names(bc.top, ClimaLand.TopBoundary()) ==
           (:surface,)
-    @test Soil.boundary_var_types(rre, bc, ClimaLand.TopBoundary()) ==
-          (NamedTuple{(:water,), Tuple{Float32}},)
+    @test Soil.boundary_var_types(rre, bc.top, ClimaLand.TopBoundary()) ==
+          (FT,)
 
-    @test Soil.boundary_vars(bc, ClimaLand.BottomBoundary()) == (:bottom_bc,)
-    @test Soil.boundary_var_domain_names(bc, ClimaLand.BottomBoundary()) ==
+    @test Soil.boundary_vars(bc.bottom, ClimaLand.BottomBoundary()) == (:bottom_bc,)
+    @test Soil.boundary_var_domain_names(bc.bottom, ClimaLand.BottomBoundary()) ==
           (:surface,)
-    @test Soil.boundary_var_types(rre, bc, ClimaLand.BottomBoundary()) ==
-          (NamedTuple{(:water,), Tuple{Float32}},)
+    @test Soil.boundary_var_types(rre, bc.bottom, ClimaLand.BottomBoundary()) ==
+          (FT,)
 
     Y, p, cds = initialize(rre)
     Y.soil.ϑ_l .= ν
     update_boundary_vars! = make_update_boundary_fluxes(rre)
     update_boundary_vars!(p, Y, FT(0))
-    f = similar(p.soil.top_bc.water)
+    f = similar(p.soil.top_bc)
     fill!(ClimaCore.Fields.field_values(f), FT(top_flux_bc.bc(p, FT(0))))
-    @test p.soil.top_bc.water == f
-    f = similar(p.soil.bottom_bc.water)
+    @test p.soil.top_bc == f
+    f = similar(p.soil.bottom_bc)
     fill!(ClimaCore.Fields.field_values(f), FT(bot_flux_bc.bc(p, FT(0))))
-    @test p.soil.bottom_bc.water == f
+    @test p.soil.bottom_bc == f
 end

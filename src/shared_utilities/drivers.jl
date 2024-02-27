@@ -8,6 +8,7 @@ import ..Parameters as LP
 export AbstractAtmosphericDrivers,
     AbstractRadiativeDrivers,
     PrescribedAtmosphere,
+    PrescribedPrecipitation,
     CoupledAtmosphere,
     PrescribedRadiativeFluxes,
     CoupledRadiativeFluxes,
@@ -96,6 +97,21 @@ struct PrescribedAtmosphere{
         args = (liquid_precip, snow_precip, T, u, q, P, c_co2, ref_time)
         return new{typeof(h), typeof.(args)...}(args..., h, gustiness)
     end
+end
+
+"""
+    PrescribedPreciptiation{FT, LP} <: AbstractAtmosphericDrivers{FT}
+
+Container for holding prescribed precipitation driver
+for models which only require precipitation (RichardsModel).
+$(DocStringExtensions.FIELDS)
+"""
+struct PrescribedPrecipitation{
+    FT,
+    LP <: AbstractTimeVaryingInput,
+} <: AbstractAtmosphericDrivers{FT}
+    "Precipitation (m/s) function of time: positive by definition"
+    liquid_precip::LP
 end
 
 """
@@ -657,6 +673,21 @@ function initialize_drivers(a::PrescribedAtmosphere{FT}, coords) where {FT}
 end
 
 """
+"""
+function initialize_drivers(a::PrescribedPrecipitation{FT}, coords) where {FT}
+    keys = (:P_liq,)
+    types = (FT,)
+    domain_names = (:surface,)
+    model_name = :drivers
+    # intialize_vars packages the variables as a named tuple,
+    # as part of a named tuple with `model_name` as the key.
+    # Here we just want the variable named tuple itself
+    vars =
+        ClimaLand.initialize_vars(keys, types, domain_names, coords, model_name)
+    return vars.drivers
+end
+
+"""
     initialize_drivers(r::CoupledAtmosphere{FT}, coords) where {FT}
 
 Creates and returns a NamedTuple for the `CoupledAtmosphere` driver,
@@ -777,6 +808,15 @@ function make_update_drivers(a::PrescribedAtmosphere{FT}) where {FT}
         evaluate!(p.drivers.u, a.u, t)
         evaluate!(p.drivers.q, a.q, t)
         evaluate!(p.drivers.c_co2, a.c_co2, t)
+    end
+    return update_drivers!
+end
+
+"""
+"""
+function make_update_drivers(a::PrescribedPrecipitation{FT}) where {FT}
+    function update_drivers!(p, t)
+        evaluate!(p.drivers.P_liq, a.liquid_precip, t)
     end
     return update_drivers!
 end
