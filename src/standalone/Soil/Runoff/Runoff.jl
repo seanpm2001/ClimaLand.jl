@@ -1,14 +1,16 @@
 module Runoff
-using ClimaCore.Operators: column_integral_definite!
-using ClimaCore.Fields: Field
+using ClimaCore
 using ClimaLand
 import ClimaLand: source!
-using ..ClimaLand.Soil: AbstractSoilSource, AbstractSoilModel
+using ..ClimaLand.Soil: AbstractSoilSource, AbstractSoilModel, RichardsModel, EnergyHydrology
 export soil_surface_infiltration,
     TOPMODELRunoff,
     AbstractRunoffModel,
     TOPMODELSubsurfaceRunoff,
-    subsurface_runoff_source
+    subsurface_runoff_source,
+    soil_surface_infiltration,
+    topmodel_ss_flux
+    
 
 """
     AbstractRunoffModel
@@ -56,13 +58,20 @@ subsurface_runoff_source(
 
 struct TOPMODELSubsurfaceRunoff{FT} <: AbstractSoilSource{FT}
     R_sb::FT
+    f_over::FT
 end
 
-struct TOPMODELRunoff{FT <: AbstractFloat, F <: Field} <: AbstractRunoffModel
+struct TOPMODELRunoff{FT <: AbstractFloat, F <: ClimaCore.Fields.Field} <: AbstractRunoffModel
     f_over::FT
     f_max::F
     subsurface_source::TOPMODELSubsurfaceRunoff{FT}
 end
+
+function TOPMODELRunoff{FT}(; f_over::FT, f_max::F, R_sb::FT) where {FT, F}
+    subsurface_source = TOPMODELSubsurfaceRunoff{FT}(R_sb, f_over)
+    return TOPMODELRunoff{FT, F}(f_over, f_max, subsurface_source)
+end
+
 
 """
 TOPMODEL infiltration
@@ -72,44 +81,61 @@ function soil_surface_infiltration(
     precip,
     Y,
     p,
-    surface_space,
-    model::AbstractSoilModel,
+    model,
 )
+    flux_ic = soil_infiltration_capacity_flux(model, Y, p)
+    return @. topmodel_surface_infiltration(p.soil.h∇, runoff.f_max, runoff.f_over, model.domain.depth - p.soil.h∇, flux_ic, precip)
+end
+function topmodel_surface_infiltration(h∇, f_max, f_over, z∇, f_ic, precip)
+    f_sat = f_max*exp(-f_over/2*z∇) # This will be extremely small if the depth is ~50m and h∇ = 0
+    return (1-f_sat)*max(f_ic, precip)
+end
 
-    # we need this at the surface only
-    surface_space = axes(Δz_top)
-    (; hydrology_cm, K_sat, ν, θ_r) = model.parameters
-    K_eff = p.soil.K ./  ClimaLand.Soil.hydraulic_conductivity(
-                hydrology_cm,
-                K_sat,
-                effective_saturation(ν, Y.soil.ϑ_l, θ_r),
-            )
-    infiltration_capacity = get_top_surface_field(-K_eff, surface_space)
-    #needs to be by column
-    h∇ = ClimaCore.Fields.zeros(surface_space)
-    water_content = Y.soil.ϑ_l .+ Y.soil.θ_i
-    column_integral_definite!(h∇, heaviside.(water_content .- ν .-0.001))# water table thickness
-    fsat = @. runoff.f_max*exp(-1/2*runoff.f_over*(model.domain.depth - h∇)).*heaviside(h∇) # only apply where there is a water table
-    return @. (1 - fsat) * max(infiltration_capacity, precip)
+function soil_infiltration_capacity_flux(model::RichardsModel, Y, p)
+    return ClimaLand.Soil.get_top_surface_field(-1 .* model.parameters.K_sat, model.domain.space.surface)
+end
+
+function soil_infiltration_capacity_flux(model::EnergyHydrology, Y, p)
+    (; Ksat, θ_r, Ω, γ, γT_ref) = model.parameters
+    K_eff = @. Ksat * impedance_factor(Y.soil.θ_i / (p.soil.θ_l + Y.soil.θ_i - θ_r), Ω) * viscosity_factor(p.soil.T, γ, γT_ref)
+    return ClimaLand.Soil.get_top_surface_field(-1 .* Keff, model.domain.space.surface)
+end
+
+
+"""
+    TOPMODEL sink term for baseflow
+"""
+function ClimaLand.source!(
+    dY::ClimaCore.Fields.FieldVector,
+    src::TOPMODELSubsurfaceRunoff,
+    Y::ClimaCore.Fields.FieldVector,
+    p::NamedTuple,
+    model::RichardsModel,
+)
+    FT = eltype(Y.soil.ϑ_l)
+    ν = model.parameters.ν
+    h∇ = p.soil.h∇
+    @. dY.soil.ϑ_l -= p.soil.R_ss / max(h∇, eps(FT)) * ClimaLand.heaviside(Y.soil.ϑ_l  - ν) # apply only to saturated layers
 end
 
 """
     TOPMODEL sink term for baseflow
 """
 function ClimaLand.source!(
-    dY,
+    dY::ClimaCore.Fields.FieldVector,
     src::TOPMODELSubsurfaceRunoff,
-    Y,
-    p,
-    model::AbstractSoilModel,
+    Y::ClimaCore.Fields.FieldVector,
+    p::NamedTuple,
+    model::EnergyHydrology,
 )
+    FT = eltype(Y.soil.ϑ_l)
     ν = model.parameters.ν
-    #needs to be by column
-    h∇ = ClimaCore.Fields.zeros(surface_space)
-    water_content = Y.soil.ϑ_l .+ Y.soil.θ_i
-    h∇ = column_integral_definite!(h∇, sum(heaviside.(water_content .- ν .-0.001)))# water table thickness
-    @. dY.soil.ϑ_l -= src.R_sb * exp(-f_over*(model.domain.depth - h∇)) / h∇ * heaviside.(water_content .- ν- 0.001) # apply only to saturated layers
+    h∇ = p.soil.h∇
+    @. dY.soil.ϑ_l -= p.soil.R_ss / max(h∇, eps(FT)) * ClimaLand.heaviside(Y.soil.ϑ_l + Y.soil.θ_i  - ν) # apply only to saturated layers
+end
 
+function topmodel_ss_flux(R_sb::FT, f_over::FT, z∇::FT) where {FT}
+    return R_sb * exp(-f_over*z∇)
 end
 
 subsurface_runoff_source(runoff::TOPMODELRunoff) = runoff.subsurface_source

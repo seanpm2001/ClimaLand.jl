@@ -169,11 +169,11 @@ Appends `src` to the tuple of sources `srcs` if `src` is of type `AbstractSoilSo
 """
 append_source(src::Nothing, srcs::Tuple)::Tuple = srcs
 
-include("Runoff/Runoff.jl")
-using .Runoff
 include("./retention_models.jl")
 include("./rre.jl")
 include("./energy_hydrology.jl")
+include("Runoff/Runoff.jl")
+using .Runoff
 include("./boundary_conditions.jl")
 include("./soil_hydrology_parameterizations.jl")
 include("./soil_heat_parameterizations.jl")
