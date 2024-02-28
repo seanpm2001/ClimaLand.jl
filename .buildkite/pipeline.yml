@@ -81,7 +81,6 @@ steps:
       - label: "Richards Runoff CPU"
         command: "julia --color=yes --project=experiments experiments/standalone/Soil/richards_runoff.jl"
         artifact_paths: "experiments/standalone/Soil/artifacts/*png"
-	
 
   - group: "ClimaLandSimulations"
     steps:
@@ -137,7 +136,7 @@ steps:
           slurm_mem: 8G
           slurm_gpus: 1
         artifact_paths: "experiments/standalone/Bucket/artifacts_temporalmap/*gpu*"
-	
+
       - label: "Richards Runoff GPU"
         command: "julia --color=yes --project=experiments experiments/standalone/Soil/richards_runoff.jl"
         agents:
