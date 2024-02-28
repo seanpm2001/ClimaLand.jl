@@ -181,9 +181,8 @@ function ClimaLand.source!(
     model::AbstractSoilModel,
 )
     FT = eltype(Y.soil.ϑ_l)
-    ν = model.parameters.ν
     h∇ = p.soil.h∇
-    @. dY.soil.ϑ_l -= p.soil.R_ss / max(h∇, eps(FT)) * is_saturated(Y, model) # apply only to saturated layers
+    dY.soil.ϑ_l .-= @.(p.soil.R_ss / max(h∇, eps(FT))) .* is_saturated(Y, model) # apply only to saturated layers
 end
 
 """
