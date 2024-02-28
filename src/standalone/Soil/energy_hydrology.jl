@@ -224,8 +224,10 @@ function EnergyHydrology{FT}(;
     top_bc = boundary_conditions.top
     if typeof(top_bc) <: AtmosDrivenFluxBC
         # If the top BC indicates atmospheric conditions are driving the model
-        # add baseflow as a sink term
+        # add baseflow as a sink term, sublimation as a sink term for ice
+        sublimation_source = SoilSublimation{FT}(Δz_top)
         subsurface_source = subsurface_runoff_source(top_bc.runoff)
+        sources = append_source(sublimation_source, sources)
         sources = append_source(subsurface_source, sources)
     end
     args = (parameters, domain, boundary_conditions, sources)
@@ -734,4 +736,73 @@ saturated.
 """
 function is_saturated(Y, model::EnergyHydrology)
     return @. ClimaLand.heaviside(Y.soil.ϑ_l + Y.soil.θ_i - model.parameters.ν)
+end
+
+"""
+    SoilSublimation{FT} <: AbstractSoilSource{FT}
+SoilSublimation source type.
+"""
+struct SoilSublimation{FT} <: AbstractSoilSource{FT}
+    Δz::FT
+end
+
+"""
+     source!(dY::ClimaCore.Fields.FieldVector,
+             src::SoilSublimation{FT},
+             Y::ClimaCore.Fields.FieldVector,
+             p::NamedTuple,
+             model
+             )
+
+Computes the source term for ice due to sublimation at the surface.
+This is only  used with the `AtmosDrivenFluxBC` type.
+"""
+function ClimaLSM.source!(
+    dY::ClimaCore.Fields.FieldVector,
+    src::SoilSublimation{FT},
+    Y::ClimaCore.Fields.FieldVector,
+    p::NamedTuple,
+    model,
+) where {FT}
+    params = model.parameters
+    (; earth_param_set) = params
+    atmos = model.bc.top.atmos
+    thermo_params =
+        LSMP.thermodynamic_parameters(model.parameters.earth_param_set)
+    _ρ_i = FT(LSMP.ρ_cloud_ice(earth_param_set))
+    T_sfc = surface_temperature(model, Y, p, t)
+    ρ_sfc = surface_air_density(atmos, model, Y, p, t, T_sfc)
+    q_sfc = Thermodynamics.q_vap_saturation_generic.(thermo_params,
+                                                     T_sfc,
+                                                     ρ_sfc,
+                                                     Thermodynamics.Ice(),
+                                                     )
+    β_sfc = soil_sublimation_beta(Y.soil.θ_i)
+    h_sfc = surface_height(model, Y, p)
+    r_sfc = FT(0.0)
+    d_sfc = displacement_height(model, Y, p)
+    ts_air = construct_atmos_ts(atmos, p, thermo_params)
+    u_air = p.drivers.u
+    h_air = atmos.h
+    conditions = turbulent_fluxes_at_a_point.(T_sfc,
+                                              q_sfc,
+                                              ρ_sfc,
+                                              β_sfc,
+                                              h_sfc,
+                                              r_sfc,
+                                              d_sfc,
+                                              ts_air,
+                                              u_air,
+                                              h_air,
+                                              atmos.gustiness,
+                                              model.parameters.z_0m,
+                                              model.parameters.z_0b,
+                                              Ref(model.parameters.earth_param_set),
+                                              )
+    
+    # what if this causes θ_i to be negative? - use beta! or r
+    z_sfc = ClimaCore.Fields.coordinate_field(model.domain.space.surface).z
+    z = ClimaCore.Fields.coordinate_field(model.domain.space.subsurface).z
+    
+    @. dY.soil.θ_i += -conditions.vapor_flux / _ρ_i / src.Δz * heaviside((z_sfc - z) - src.Δz) # only apply to top Δz
 end
