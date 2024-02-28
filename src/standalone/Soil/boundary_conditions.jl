@@ -105,7 +105,8 @@ methods you define.
 
 Use this function in the exact same way you would use `auxiliary_vars`.
 """
-boundary_vars(::Union{NamedTuple, AbstractSoilBC}, ::ClimaLand.TopBoundary) = (:top_bc,)
+boundary_vars(::Union{NamedTuple, AbstractSoilBC}, ::ClimaLand.TopBoundary) =
+    (:top_bc,)
 
 """
     boundary_vars(::Union{NamedTuple, AbstractSoilBC}, ::ClimaLand.BottomBoundary)
@@ -126,7 +127,8 @@ methods you define.
 
 Use this function in the exact same way you would use `auxiliary_vars`.
 """
-boundary_vars(::Union{NamedTuple, AbstractSoilBC}, ::ClimaLand.BottomBoundary) = (:bottom_bc,)
+boundary_vars(::Union{NamedTuple, AbstractSoilBC}, ::ClimaLand.BottomBoundary) =
+    (:bottom_bc,)
 
 """
     boundary_var_domain_names(::Union{NamedTuple, AbstractSoilBC}, ::ClimaLand.AbstractBoundary)
@@ -142,8 +144,10 @@ the boundary flux.
 
 Use this function in the exact same way you would use `auxiliary_domain_names`.
 """
-boundary_var_domain_names(::Union{NamedTuple, AbstractSoilBC}, ::ClimaLand.AbstractBoundary) =
-    (:surface,)
+boundary_var_domain_names(
+    ::Union{NamedTuple, AbstractSoilBC},
+    ::ClimaLand.AbstractBoundary,
+) = (:surface,)
 
 """
     boundary_var_types(::Soil.EnergyHydrology{FT}, ::NamedTuple, ::ClimaLand.AbstractBoundary) where {FT}
@@ -242,15 +246,20 @@ If you wish to simulate precipitation and runoff in the full `EnergyHydrology` m
 you must use the `AtmosDrivenFluxBC` type.
 $(DocStringExtensions.FIELDS)
 """
-struct RichardsAtmosDrivenFluxBC{F <: PrescribedPrecipitation, R <: AbstractRunoffModel} <:
-       AbstractSoilBC
+struct RichardsAtmosDrivenFluxBC{
+    F <: PrescribedPrecipitation,
+    R <: AbstractRunoffModel,
+} <: AbstractSoilBC
     "The prescribed liquid water precipitation rate f(t) (m/s); Negative by convention."
     precip::F
     "The runoff model. The default is no runoff."
     runoff::R
 end
 
-function RichardsAtmosDrivenFluxBC(precip::PrescribedPrecipitation; runoff = NoRunoff())
+function RichardsAtmosDrivenFluxBC(
+    precip::PrescribedPrecipitation;
+    runoff = NoRunoff(),
+)
     return RichardsAtmosDrivenFluxBC{typeof(precip), typeof(runoff)}(
         precip,
         runoff,
@@ -267,11 +276,13 @@ TOPMODELRunoff.
 
 These variables are updated in place in `boundary_flux`.
 """
-boundary_vars(bc::RichardsAtmosDrivenFluxBC{<:PrescribedPrecipitation,
-                                            <:Runoff.TOPMODELRunoff,
-                                            },
-              ::ClimaLand.TopBoundary) =
-                  (:top_bc,:h∇, :R_s, :R_ss)
+boundary_vars(
+    bc::RichardsAtmosDrivenFluxBC{
+        <:PrescribedPrecipitation,
+        <:Runoff.TOPMODELRunoff,
+    },
+    ::ClimaLand.TopBoundary,
+) = (:top_bc, :h∇, :R_s, :R_ss)
 
 """
     boundary_var_domain_names(::RichardsAtmosDrivenFluxBC{<:PrescribedPrecipitation,
@@ -282,11 +293,13 @@ boundary_vars(bc::RichardsAtmosDrivenFluxBC{<:PrescribedPrecipitation,
 An extension of the `boundary_var_domain_names` method for RichardsAtmosDrivenFluxBC
 with TOPMODELRunoff. 
 """
-boundary_var_domain_names(bc::RichardsAtmosDrivenFluxBC{<:PrescribedPrecipitation,
-                                              <:Runoff.TOPMODELRunoff,
-                                                        },
-                          ::ClimaLand.TopBoundary) =
-                              (:surface, :surface, :surface, :surface)
+boundary_var_domain_names(
+    bc::RichardsAtmosDrivenFluxBC{
+        <:PrescribedPrecipitation,
+        <:Runoff.TOPMODELRunoff,
+    },
+    ::ClimaLand.TopBoundary,
+) = (:surface, :surface, :surface, :surface)
 """
     boundary_var_types(::RichardsAtmosDrivenFluxBC{<:PrescribedPrecipitation,
                                                    <:Runoff.TOPMODELRunoff{FT},
@@ -299,16 +312,12 @@ with TOPMODELRunoff.
 """
 boundary_var_types(
     model::RichardsModel{FT},
-    bc::RichardsAtmosDrivenFluxBC{<:PrescribedPrecipitation,
-                                  <:Runoff.TOPMODELRunoff{FT},
-                                  },
+    bc::RichardsAtmosDrivenFluxBC{
+        <:PrescribedPrecipitation,
+        <:Runoff.TOPMODELRunoff{FT},
+    },
     ::ClimaLand.TopBoundary,
-) where {FT} = (
-    FT,
-    FT,
-    FT,
-    FT
-)
+) where {FT} = (FT, FT, FT, FT)
 
 
 
@@ -384,13 +393,15 @@ net radiation to the auxiliary variables.
 
 These variables are updated in place in `soil_boundary_fluxes`.
 """
-boundary_vars(bc::AtmosDrivenFluxBC{<:AbstractAtmosphericDrivers,
-                                    <:AbstractRadiativeDrivers,
-                                    <:AbstractRunoffModel,
-                                    },
-              ::ClimaLand.TopBoundary) =
-                  (:turbulent_fluxes, :R_n, :top_bc)
-              
+boundary_vars(
+    bc::AtmosDrivenFluxBC{
+        <:AbstractAtmosphericDrivers,
+        <:AbstractRadiativeDrivers,
+        <:AbstractRunoffModel,
+    },
+    ::ClimaLand.TopBoundary,
+) = (:turbulent_fluxes, :R_n, :top_bc)
+
 """
     boundary_var_domain_names(::AtmosDrivenFluxBC{<:AbstractAtmosphericDrivers,
                                                   <:AbstractRadiativeDrivers,
@@ -402,12 +413,14 @@ An extension of the `boundary_var_domain_names` method for AtmosDrivenFluxBC. Th
 specifies the part of the domain on which the additional variables should be
 defined.
 """
-boundary_var_domain_names(bc::AtmosDrivenFluxBC{<:AbstractAtmosphericDrivers,
-                                                <:AbstractRadiativeDrivers,
-                                                <:AbstractRunoffModel,
-                                                },
-                          ::ClimaLand.TopBoundary) =
-                              (:surface, :surface, :surface)
+boundary_var_domain_names(
+    bc::AtmosDrivenFluxBC{
+        <:AbstractAtmosphericDrivers,
+        <:AbstractRadiativeDrivers,
+        <:AbstractRunoffModel,
+    },
+    ::ClimaLand.TopBoundary,
+) = (:surface, :surface, :surface)
 """
     boundary_var_types(
         ::AtmosDrivenFluxBC{
@@ -475,16 +488,11 @@ function soil_boundary_fluxes(
     p.soil.R_n .= net_radiation(bc.radiation, model, Y, p, t)
     # We are ignoring sublimation for now
     precip = p.drivers.P_liq
-    infiltration = Runoff.soil_surface_infiltration(
-        bc.runoff,
-        precip,
-        Y,
-        p,
-        model
-    )
+    infiltration =
+        Runoff.soil_surface_infiltration(bc.runoff, precip, Y, p, model)
     # We do not model the energy flux from infiltration
     return @. create_soil_bc_named_tuple(
-        infiltration .+ p.soil.turbulent_fluxes.vapor_flux ,
+        infiltration .+ p.soil.turbulent_fluxes.vapor_flux,
         p.soil.R_n + p.soil.turbulent_fluxes.lhf + p.soil.turbulent_fluxes.shf,
     )
 end
@@ -503,13 +511,15 @@ net radiation to the auxiliary variables.
 
 These variables are updated in place in `soil_boundary_fluxes`.
 """
-boundary_vars(bc::AtmosDrivenFluxBC{<:AbstractAtmosphericDrivers,
-                                    <:AbstractRadiativeDrivers,
-                                    <:Runoff.TOPMODELRunoff,
-                                    },
-              ::ClimaLand.TopBoundary) =
-                  (:turbulent_fluxes, :R_n, :top_bc,:h∇, :R_s, :R_ss)
-              
+boundary_vars(
+    bc::AtmosDrivenFluxBC{
+        <:AbstractAtmosphericDrivers,
+        <:AbstractRadiativeDrivers,
+        <:Runoff.TOPMODELRunoff,
+    },
+    ::ClimaLand.TopBoundary,
+) = (:turbulent_fluxes, :R_n, :top_bc, :h∇, :R_s, :R_ss)
+
 """
     boundary_var_domain_names(::AtmosDrivenFluxBC{<:AbstractAtmosphericDrivers,
                                                   <:AbstractRadiativeDrivers,
@@ -522,12 +532,14 @@ with TOPMODELRunoff. This
 specifies the part of the domain on which the additional variables should be
 defined.
 """
-boundary_var_domain_names(bc::AtmosDrivenFluxBC{<:AbstractAtmosphericDrivers,
-                                                <:AbstractRadiativeDrivers,
-                                                <:Runoff.TOPMODELRunoff,
-                                                },
-                          ::ClimaLand.TopBoundary) =
-                              (:surface, :surface, :surface, :surface, :surface, :surface)
+boundary_var_domain_names(
+    bc::AtmosDrivenFluxBC{
+        <:AbstractAtmosphericDrivers,
+        <:AbstractRadiativeDrivers,
+        <:Runoff.TOPMODELRunoff,
+    },
+    ::ClimaLand.TopBoundary,
+) = (:surface, :surface, :surface, :surface, :surface, :surface)
 """
     boundary_var_types(
         ::AtmosDrivenFluxBC{
@@ -555,7 +567,7 @@ boundary_var_types(
     NamedTuple{(:water, :heat), Tuple{FT, FT}},
     FT,
     FT,
-    FT
+    FT,
 )
 
 """
@@ -586,7 +598,11 @@ the atmos and radiation conditions in order to
 compute the surface fluxes using Monin Obukhov Surface Theory.
 """
 function soil_boundary_fluxes(
-    bc::AtmosDrivenFluxBC{<:PrescribedAtmosphere, <:PrescribedRadiativeFluxes, <:Runoff.TOPMODELRunoff},
+    bc::AtmosDrivenFluxBC{
+        <:PrescribedAtmosphere,
+        <:PrescribedRadiativeFluxes,
+        <:Runoff.TOPMODELRunoff,
+    },
     boundary::ClimaLand.TopBoundary,
     model::EnergyHydrology,
     Δz,
@@ -598,21 +614,23 @@ function soil_boundary_fluxes(
     p.soil.turbulent_fluxes .= turbulent_fluxes(bc.atmos, model, Y, p, t)
     p.soil.R_n .= net_radiation(bc.radiation, model, Y, p, t)
     # need to update to compute runoff
-    column_integral_definite!(p.soil.h∇, ClimaLand.heaviside.(Y.soil.ϑ_l .+ Y.soil.θ_i .- model.parameters.ν))
-    @. p.soil.R_ss = topmodel_ss_flux(runoff.subsurface_source.R_sb, runoff.f_over, model.domain.depth - p.soil.h∇)
+    column_integral_definite!(
+        p.soil.h∇,
+        ClimaLand.heaviside.(Y.soil.ϑ_l .+ Y.soil.θ_i .- model.parameters.ν),
+    )
+    @. p.soil.R_ss = topmodel_ss_flux(
+        runoff.subsurface_source.R_sb,
+        runoff.f_over,
+        model.domain.depth - p.soil.h∇,
+    )
     # We are ignoring sublimation for now
     precip = p.drivers.P_liq
-    infiltration = Runoff.soil_surface_infiltration(
-        bc.runoff,
-        precip,
-        Y,
-        p,
-        model
-    )
+    infiltration =
+        Runoff.soil_surface_infiltration(bc.runoff, precip, Y, p, model)
     @. p.soil.R_s = abs(precip - infiltration)
     # We do not model the energy flux from infiltration
     return @. create_soil_bc_named_tuple(
-        infiltration .+ p.soil.turbulent_fluxes.vapor_flux ,
+        infiltration .+ p.soil.turbulent_fluxes.vapor_flux,
         p.soil.R_n + p.soil.turbulent_fluxes.lhf + p.soil.turbulent_fluxes.shf,
     )
 end
@@ -670,16 +688,17 @@ function ClimaLand.boundary_flux(
     surface_space = axes(Δz)
     precip = p.drivers.P_liq
     # need to update to compute runoff
-    column_integral_definite!(p.soil.h∇, ClimaLand.heaviside.(Y.soil.ϑ_l  .- model.parameters.ν))
-    @. p.soil.R_ss = topmodel_ss_flux(runoff.subsurface_source.R_sb, runoff.f_over, model.domain.depth - p.soil.h∇)
-    # We are ignoring sublimation for now
-    infiltration = soil_surface_infiltration(
-        bc.runoff,
-        precip,
-        Y,
-        p,
-        model
+    column_integral_definite!(
+        p.soil.h∇,
+        ClimaLand.heaviside.(Y.soil.ϑ_l .- model.parameters.ν),
     )
+    @. p.soil.R_ss = topmodel_ss_flux(
+        runoff.subsurface_source.R_sb,
+        runoff.f_over,
+        model.domain.depth - p.soil.h∇,
+    )
+    # We are ignoring sublimation for now
+    infiltration = soil_surface_infiltration(bc.runoff, precip, Y, p, model)
     @. p.soil.R_s = abs(precip - infiltration)
     return infiltration
 end

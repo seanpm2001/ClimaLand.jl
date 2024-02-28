@@ -106,10 +106,8 @@ Container for holding prescribed precipitation driver
 for models which only require precipitation (RichardsModel).
 $(DocStringExtensions.FIELDS)
 """
-struct PrescribedPrecipitation{
-    FT,
-    LP <: AbstractTimeVaryingInput,
-} <: AbstractAtmosphericDrivers{FT}
+struct PrescribedPrecipitation{FT, LP <: AbstractTimeVaryingInput} <:
+       AbstractAtmosphericDrivers{FT}
     "Precipitation (m/s) function of time: positive by definition"
     liquid_precip::LP
 end
@@ -673,6 +671,10 @@ function initialize_drivers(a::PrescribedAtmosphere{FT}, coords) where {FT}
 end
 
 """
+    initialize_drivers(a::PrescribedPrecipitation{FT}, coords) where {FT}
+
+Creates and returns a NamedTuple for the `PrescribedPrecipitation` driver,
+with variable `P_liq`.
 """
 function initialize_drivers(a::PrescribedPrecipitation{FT}, coords) where {FT}
     keys = (:P_liq,)
@@ -797,7 +799,7 @@ make_update_drivers(
     make_update_drivers(a::PrescribedAtmosphere{FT}) where {FT}
 
 Creates and returns a function which updates the driver variables
-in the case of a PrescribedAtmosphere at a point.
+in the case of a PrescribedAtmosphere.
 """
 function make_update_drivers(a::PrescribedAtmosphere{FT}) where {FT}
     function update_drivers!(p, t)
@@ -813,6 +815,10 @@ function make_update_drivers(a::PrescribedAtmosphere{FT}) where {FT}
 end
 
 """
+    make_update_drivers(a::PrescribedPrecipitation{FT}) where {FT}
+
+Creates and returns a function which updates the driver variables
+in the case of a PrescribedPrecipitation.
 """
 function make_update_drivers(a::PrescribedPrecipitation{FT}) where {FT}
     function update_drivers!(p, t)
@@ -825,7 +831,7 @@ end
     make_update_drivers(r::PrescribedRadiativeFluxes{FT}) where {FT}
 
 Creates and returns a function which updates the driver variables
-in the case of a PrescribedRadiativeFluxes at a point.
+in the case of a PrescribedRadiativeFluxes.
 """
 function make_update_drivers(r::PrescribedRadiativeFluxes{FT}) where {FT}
     function update_drivers!(p, t)

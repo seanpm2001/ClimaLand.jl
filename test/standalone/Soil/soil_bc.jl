@@ -282,8 +282,7 @@ end
     @test p.soil.bottom_bc.heat == f
 
 
-    boundary_fluxes =
-        (; top = top_flux_bc, bottom = bot_flux_bc)
+    boundary_fluxes = (; top = top_flux_bc, bottom = bot_flux_bc)
 
     parameters = Soil.RichardsParameters(;
         ν = ν,
@@ -292,9 +291,7 @@ end
         S_s = S_s,
         θ_r = θ_r,
     )
-    bc = (;
-          top =  top_flux_bc,
-          bottom  = bot_flux_bc)
+    bc = (; top = top_flux_bc, bottom = bot_flux_bc)
     rre = Soil.RichardsModel{FT}(;
         parameters = parameters,
         domain = soil_domain,
@@ -305,12 +302,14 @@ end
     @test Soil.boundary_vars(bc.top, ClimaLand.TopBoundary()) == (:top_bc,)
     @test Soil.boundary_var_domain_names(bc.top, ClimaLand.TopBoundary()) ==
           (:surface,)
-    @test Soil.boundary_var_types(rre, bc.top, ClimaLand.TopBoundary()) ==
-          (FT,)
+    @test Soil.boundary_var_types(rre, bc.top, ClimaLand.TopBoundary()) == (FT,)
 
-    @test Soil.boundary_vars(bc.bottom, ClimaLand.BottomBoundary()) == (:bottom_bc,)
-    @test Soil.boundary_var_domain_names(bc.bottom, ClimaLand.BottomBoundary()) ==
-          (:surface,)
+    @test Soil.boundary_vars(bc.bottom, ClimaLand.BottomBoundary()) ==
+          (:bottom_bc,)
+    @test Soil.boundary_var_domain_names(
+        bc.bottom,
+        ClimaLand.BottomBoundary(),
+    ) == (:surface,)
     @test Soil.boundary_var_types(rre, bc.bottom, ClimaLand.BottomBoundary()) ==
           (FT,)
 

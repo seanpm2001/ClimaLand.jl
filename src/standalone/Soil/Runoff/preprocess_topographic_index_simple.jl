@@ -20,11 +20,9 @@ function main(; resolution)
         @info lat_id / lat_count
         for lon_id in 1:1:lon_count
             lat_indices =
-                Array(1:1:length(lat))[(lat .>= lat_min + resolution * (lat_id - 1)) .&
-                (lat .< lat_min + resolution * lat_id)]
+                Array(1:1:length(lat))[(lat .>= lat_min + resolution * (lat_id - 1)) .& (lat .< lat_min + resolution * lat_id)]
             lon_indices =
-                Array(1:1:length(lon))[(lon .>= lon_min + resolution * (lon_id - 1)) .&
-                (lon .< lon_min + resolution * lon_id)]
+                Array(1:1:length(lon))[(lon .>= lon_min + resolution * (lon_id - 1)) .& (lon .< lon_min + resolution * lon_id)]
             ϕ = data["Band1"][lon_indices, lat_indices][:]
             present = .~(typeof.(ϕ) .<: Missing)
             present_count = sum(present)
@@ -49,11 +47,13 @@ function main(; resolution)
     ds.attrib["title"] = "Topographic Index Data"
 
     la = defVar(ds, "lat", Float32, ("lat",))
-    la[:] = (0.5:1:lat_count-0.5)./lat_count .*(lat_max - lat_min) .+ lat_min
-    
+    la[:] =
+        (0.5:1:(lat_count - 0.5)) ./ lat_count .* (lat_max - lat_min) .+ lat_min
+
     lo = defVar(ds, "lon", Float32, ("lon",))
-    lo[:] = (0.5:1:lon_count-0.5)./lon_count .*(lon_max - lon_min) .+ lon_min
-    
+    lo[:] =
+        (0.5:1:(lon_count - 0.5)) ./ lon_count .* (lon_max - lon_min) .+ lon_min
+
     mean_ϕ = defVar(ds, "ϕ_mean", Float32, ("lat", "lon"))
     mean_ϕ[:, :] = parameters[:, :, 2]
     f0 = defVar(ds, "fraction_zero", Float32, ("lat", "lon"))
