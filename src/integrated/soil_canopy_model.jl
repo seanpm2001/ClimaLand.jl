@@ -415,7 +415,7 @@ function soil_boundary_fluxes(
 ) where {FT}
     bc = soil.boundary_conditions.top
     soil_conditions = turbulent_fluxes(bc.atmos, soil, Y, p, t)
-    update_runoff!(p, bc.runoff, Y, t, model)
+    Soil.Runoff.update_runoff!(p, bc.runoff, Y, t, model)
     return @. ClimaLand.Soil.create_soil_bc_named_tuple(
         p.soil.infiltration + p.soil.turbulent_fluxes.vapor_flux,
         -p.soil.R_n + p.soil.turbulent_fluxes.lhf + p.soil.turbulent_fluxes.shf,

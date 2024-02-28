@@ -10,8 +10,7 @@ using ..ClimaLand.Soil:
     RichardsModel,
     EnergyHydrology,
     is_saturated
-export soil_surface_infiltration,
-    TOPMODELRunoff,
+export TOPMODELRunoff,
     NoRunoff,
     AbstractRunoffModel,
     TOPMODELSubsurfaceRunoff,
