@@ -1,18 +1,23 @@
 module Runoff
 using DocStringExtensions
 using ClimaCore
+using ClimaCore.Operators: column_integral_definite!
 using ClimaLand
 import ClimaLand: source!
 using ..ClimaLand.Soil:
-    AbstractSoilSource, AbstractSoilModel, RichardsModel, EnergyHydrology
+    AbstractSoilSource,
+    AbstractSoilModel,
+    RichardsModel,
+    EnergyHydrology,
+    is_saturated
 export soil_surface_infiltration,
     TOPMODELRunoff,
     NoRunoff,
     AbstractRunoffModel,
     TOPMODELSubsurfaceRunoff,
-    soil_surface_infiltration,
     subsurface_runoff_source,
-    topmodel_ss_flux
+    topmodel_ss_flux,
+    update_runoff!
 
 
 """
@@ -22,9 +27,9 @@ The soil runoff models are only to be used with
 the following boundary condition types:
 - `ClimaLand.Soil.AtmosDrivenFluxBC`
 - `ClimaLand.Soil.RichardsAtmosDrivenFluxBC`.
-It must have methods for these functions:
--`soil_surface_infiltration` (defined in this module)
+It must have methods for
 - `subsurface_runoff_source` (defined in this module)
+- `update_runoff!` (defined in this module)
 - `ClimaLand.source!`.
 Please see the documentation for these for more details.
 
@@ -41,6 +46,7 @@ model `runoff`.
 """
 subsurface_runoff_source(runoff::AbstractRunoffModel) = runoff.subsurface_source
 
+
 """
     NoRunoff <: AbstractRunoffModel
 A concrete type of soil runoff model; the 
@@ -55,14 +61,10 @@ struct NoRunoff <: AbstractRunoffModel
 end
 
 """
-    soil_surface_infiltration(::NoRunoff, precip, _...)
-
-A function which computes the infiltration into the soil
- for the default of `NoRunoff`.
-
-Returns the precipitation (no surface runoff).
 """
-soil_surface_infiltration(::NoRunoff, precip, _...) = precip
+function update_runoff!(p, Y, t, runoff::NoRunoff)
+    p.soil.infiltration .= p.drivers.P_liq
+end
 
 # TOPMODEL
 
@@ -115,35 +117,32 @@ end
 
 
 """
-    soil_surface_infiltration(
-        runoff::TOPMODELRunoff,
-        precip,
-        Y,
-        p,
-        model::AbstractSoilModel,
-    )
+    update_runoff!(p, runoff::TOPMODELRunoff, Y,t, model::AbstractSoilModel)
 
-A function which returns the infiltration into the soil,
-given the precipitation flux (m/s), the runoff model (TOPMODEL),
-the state Y, cache p, and soil model `model`.
-
-This function first computes the infiltration capacity as a flux,
-and then computes the infiltration flux according to the SIMTOP
-implementation of TOPMODEL.
-
-see: Niu et al. (2005),
-"A simple TOPMODEL-based runoff parameterization (SIMTOP) for
-use in global climate models".
+Updates the runoff model variables in place in `p.soil` for the TOPMODELRunoff
+parameterization:
+p.soil.R_s
+p.soil.R_ss
+p.soil.h∇
+p.soil.infiltration
 """
-function soil_surface_infiltration(
-    runoff::TOPMODELRunoff,
-    precip,
-    Y,
+function update_runoff!(
     p,
+    runoff::TOPMODELRunoff,
+    Y,
+    t,
     model::AbstractSoilModel,
 )
-    flux_ic = soil_infiltration_capacity_flux(model, Y, p)
-    return @. topmodel_surface_infiltration(
+    column_integral_definite!(p.soil.h∇, is_saturated(Y, model))
+    @. p.soil.R_ss = topmodel_ss_flux(
+        runoff.subsurface_source.R_sb,
+        runoff.f_over,
+        model.domain.depth - p.soil.h∇,
+    )
+    precip = p.drivers.P_liq
+    flux_ic = soil_infiltration_capacity_flux(model, Y, p) # allocates
+
+    @. p.soil.infiltration = topmodel_surface_infiltration(
         p.soil.h∇,
         runoff.f_max,
         runoff.f_over,
@@ -151,6 +150,40 @@ function soil_surface_infiltration(
         flux_ic,
         precip,
     )
+    @. p.soil.R_s = abs(precip - p.soil.infiltration)
+
+end
+
+"""
+    ClimaLand.source!(
+        dY::ClimaCore.Fields.FieldVector,
+        src::TOPMODELSubsurfaceRunoff,
+        Y::ClimaCore.Fields.FieldVector,
+        p::NamedTuple,
+        model::AbstractSoilModel,
+    )
+
+Adjusts dY.soil.ϑ_l in place to account for the loss of
+water due to subsurface runoff.
+
+The sink term is given by - R_ss/h∇ H(ϑ_l+θ_i - ν),
+where H is the Heaviside function, h∇ is the water table
+thickness (defined to be where ϑ_l+θ_i>ν), and R_ss is the runoff as a
+flux(m/s).
+
+The θ_i contribution is not include for RichardsModel.
+"""
+function ClimaLand.source!(
+    dY::ClimaCore.Fields.FieldVector,
+    src::TOPMODELSubsurfaceRunoff,
+    Y::ClimaCore.Fields.FieldVector,
+    p::NamedTuple,
+    model::AbstractSoilModel,
+)
+    FT = eltype(Y.soil.ϑ_l)
+    ν = model.parameters.ν
+    h∇ = p.soil.h∇
+    @. dY.soil.ϑ_l -= p.soil.R_ss / max(h∇, eps(FT)) * is_saturated(Y, model) # apply only to saturated layers
 end
 
 """
@@ -202,73 +235,6 @@ function soil_infiltration_capacity_flux(model::EnergyHydrology, Y, p)
         -1 .* Keff,
         model.domain.space.surface,
     )
-end
-
-
-"""
-    ClimaLand.source!(
-        dY::ClimaCore.Fields.FieldVector,
-        src::TOPMODELSubsurfaceRunoff,
-        Y::ClimaCore.Fields.FieldVector,
-        p::NamedTuple,
-        model::RichardsModel,
-    )
-
-Adjusts dY.soil.ϑ_l in place to account for the loss of
-water due to subsurface runoff.
-
-The sink term is given by - R_ss/h∇ H(ϑ_l - ν),
-where H is the Heaviside function, h∇ is the water table
-thickness (defined to be where ϑ_l>ν), and R_ss is the runoff as a
-flux(m/s).
-"""
-function ClimaLand.source!(
-    dY::ClimaCore.Fields.FieldVector,
-    src::TOPMODELSubsurfaceRunoff,
-    Y::ClimaCore.Fields.FieldVector,
-    p::NamedTuple,
-    model::RichardsModel,
-)
-    FT = eltype(Y.soil.ϑ_l)
-    ν = model.parameters.ν
-    h∇ = p.soil.h∇
-    @. dY.soil.ϑ_l -=
-        p.soil.R_ss / max(h∇, eps(FT)) * ClimaLand.heaviside(Y.soil.ϑ_l - ν) # apply only to saturated layers
-end
-
-"""
-    ClimaLand.source!(
-        dY::ClimaCore.Fields.FieldVector,
-        src::TOPMODELSubsurfaceRunoff,
-        Y::ClimaCore.Fields.FieldVector,
-        p::NamedTuple,
-        model::EnergyHydrology,
-    )
-
-Adjusts dY.soil.ϑ_l in place to account for the loss of
-water due to subsurface runoff.
-
-The sink term is given by - R_ss/h∇ H(ϑ_l + θ_i - ν),
-where H is the Heaviside function, h∇ is the water table
-thickness (defined to be where ϑ_l+θ_i>ν), and R_ss is the runoff as a
-flux(m/s).
-
-The only different compared with the method for Richards model is that this
-takes into account the presence of ice.
-"""
-function ClimaLand.source!(
-    dY::ClimaCore.Fields.FieldVector,
-    src::TOPMODELSubsurfaceRunoff,
-    Y::ClimaCore.Fields.FieldVector,
-    p::NamedTuple,
-    model::EnergyHydrology,
-)
-    FT = eltype(Y.soil.ϑ_l)
-    ν = model.parameters.ν
-    h∇ = p.soil.h∇
-    @. dY.soil.ϑ_l -=
-        p.soil.R_ss / max(h∇, eps(FT)) *
-        ClimaLand.heaviside(Y.soil.ϑ_l + Y.soil.θ_i - ν) # apply only to saturated layers
 end
 
 """

@@ -28,7 +28,15 @@ domain = ClimaLand.Domains.SphericalShell(;
 surface_space = domain.space.surface
 subsurface_space = domain.space.subsurface
 # Read in f_max data and land sea mask
-infile_path = joinpath(pkgdir(ClimaLand), "means_2.5_new.nc")
+topmodel_dataset = ArtifactWrapper(
+    @__DIR__,
+    "processed_topographic_index 2.5 deg",
+    ArtifactFile[ArtifactFile(
+        url = "https://caltech.box.com/shared/static/dwa7g0uzhxd50a2z3thbx3a12n0r887s.nc",
+        filename = "means_2.5_new.csv",
+    ),],
+)
+infile_path = get_data_folder(topmodel_dataset)
 regrid_dirpath = "regrid"
 outfile_root =
     joinpath(pkgdir(ClimaLand), "experiments/standalone/Soil/static_data_cgll")
@@ -233,3 +241,6 @@ for (i, (field, field_name)) in enumerate(
     outfile = joinpath(outdir, string("heatmap_", field_name, ".png"))
     CairoMakie.save(outfile, fig)
 end
+
+# Delete testing directory and files
+rm(regrid_dir; recursive = true, force = true)

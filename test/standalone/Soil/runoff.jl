@@ -5,8 +5,6 @@ FT = Float32
 @testset "Base runoff functionality, FT = $FT" begin
     runoff = ClimaLand.Soil.Runoff.NoRunoff()
     precip = 5.0
-    @test ClimaLand.Soil.Runoff.soil_surface_infiltration(runoff, precip) ==
-          precip
     @test ClimaLand.Soil.Runoff.subsurface_runoff_source(runoff) == nothing
     struct Foo{FT} <: ClimaLand.Soil.Runoff.AbstractSoilSource{FT} end
     srcs = (1, 2, 3)
@@ -77,6 +75,7 @@ end
     @test :R_s ∈ propertynames(p.soil)
     @test :R_ss ∈ propertynames(p.soil)
     @test :h∇ ∈ propertynames(p.soil)
+    @test :infiltration ∈ propertynames(p.soil)
 
     # set initial conditions
     z = ClimaCore.Fields.coordinate_field(domain.space.subsurface).z
@@ -97,7 +96,8 @@ end
     )
     ic_flux = ClimaLand.Soil.Runoff.soil_infiltration_capacity_flux(model, Y, p)
     @test ic_flux == ClimaCore.Fields.zeros(surface_space) .- FT(1e-6)
-    infiltration = @. ClimaLand.Soil.Runoff.topmodel_surface_infiltration(
+    @test p.soil.infiltration ==
+          @. ClimaLand.Soil.Runoff.topmodel_surface_infiltration(
         p.soil.h∇,
         f_max,
         f_over,
@@ -105,5 +105,5 @@ end
         ic_flux,
         precip_field,
     )
-    @test p.soil.R_s == abs.(precip_field .- infiltration)
+    @test p.soil.R_s == abs.(precip_field .- p.soil.infiltration)
 end

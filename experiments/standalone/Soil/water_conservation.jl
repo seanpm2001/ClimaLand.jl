@@ -256,10 +256,8 @@ for FT in (Float32, Float64)
 
         # Calculate water mass balance over entire simulation
         # Because we use Backward Euler, compute fluxes at times[2:end]
-        flux_in_sim = [
-            parent(sv.saveval[k].soil.top_bc.water)[1] for
-            k in 2:length(sv.saveval)
-        ]
+        flux_in_sim =
+            [parent(sv.saveval[k].soil.top_bc)[1] for k in 2:length(sv.saveval)]
 
 
         mass_end = sum(sol.u[end].soil.ϑ_l)
