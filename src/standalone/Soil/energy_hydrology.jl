@@ -746,6 +746,15 @@ struct SoilSublimation{FT} <: AbstractSoilSource{FT}
     Δz::FT
 end
 
+function β(x::FT, x_c::FT, p::FT) where {FT}
+    safe_x = max(0, x)
+    if safe_x < x_c
+        (safe_x / x_c)^p
+    else
+        FT(1.0)
+    end
+end
+
 """
      source!(dY::ClimaCore.Fields.FieldVector,
              src::SoilSublimation{FT},
@@ -764,6 +773,15 @@ function ClimaLSM.source!(
     p::NamedTuple,
     model,
 ) where {FT}
+    z_sfc = ClimaCore.Fields.coordinate_field(model.domain.space.surface).z
+    z = ClimaCore.Fields.coordinate_field(model.domain.space.subsurface).z
+    indicator = @.  heaviside((z_sfc - z) - src.Δz)
+    scratch = ;
+    available_ice = column_integral_definite!(scratch,Y.soil.θ_i .* indicator)
+    # get surface porosity
+    β_sfc = β.(available_ice, model.parameters.ν/10, 2)
+
+    # we should only do the below for columns where available_ice > 0    
     params = model.parameters
     (; earth_param_set) = params
     atmos = model.bc.top.atmos
@@ -777,7 +795,6 @@ function ClimaLSM.source!(
                                                      ρ_sfc,
                                                      Thermodynamics.Ice(),
                                                      )
-    β_sfc = soil_sublimation_beta(Y.soil.θ_i)
     h_sfc = surface_height(model, Y, p)
     r_sfc = FT(0.0)
     d_sfc = displacement_height(model, Y, p)
@@ -800,9 +817,6 @@ function ClimaLSM.source!(
                                               Ref(model.parameters.earth_param_set),
                                               )
     
-    # what if this causes θ_i to be negative? - use beta! or r
-    z_sfc = ClimaCore.Fields.coordinate_field(model.domain.space.surface).z
-    z = ClimaCore.Fields.coordinate_field(model.domain.space.subsurface).z
     
-    @. dY.soil.θ_i += -conditions.vapor_flux / _ρ_i / src.Δz * heaviside((z_sfc - z) - src.Δz) # only apply to top Δz
+    @. dY.soil.θ_i += -conditions.vapor_flux / _ρ_i / src.Δz * indicator # only apply to top Δz
 end
