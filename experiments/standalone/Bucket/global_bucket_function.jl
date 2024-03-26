@@ -197,6 +197,33 @@ F_sfc = [
     ) for k in 1:length(sol.t)
 ];
 
+@show [
+    mean(parent(sol.u[k].bucket.W)) for k in 1:length(sol.t)
+];
+@show [
+    mean(parent(sol.u[k].bucket.Ws)) for k in 1:length(sol.t)
+];
+@show [
+    mean(parent(sol.u[k].bucket.σS)) for k in 1:length(sol.t)
+];
+@show [
+    mean(parent(saved_values.saveval[k].bucket.T_sfc))
+    for k in 1:length(sol.t)
+];
+@show [
+    mean(parent(
+        saved_values.saveval[k].bucket.turbulent_fluxes.vapor_flux,
+    )) for k in 1:length(sol.t)
+];
+@show [
+    mean(parent(
+        saved_values.saveval[k].bucket.R_n .+
+        saved_values.saveval[k].bucket.turbulent_fluxes.lhf .+
+        saved_values.saveval[k].bucket.turbulent_fluxes.shf,
+    )) for k in 1:length(sol.t)
+];
+
+
 # save prognostic state to CSV - for comparison between
 # GPU and CPU output
 device_suffix =
@@ -246,6 +273,7 @@ for (i, (field_ts, field_name)) in enumerate(
         ylabel = field_name,
         title = "Global bucket with analytic albedo",
     )
+    @show [mean(x) for x in field_ts]
     CairoMakie.lines!(ax2, sol.t ./ 3600 ./ 24, [mean(x) for x in field_ts])
 end
 outfile = joinpath(outdir, string("ts_$device_suffix.png"))
