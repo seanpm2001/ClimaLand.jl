@@ -51,14 +51,6 @@ subsurface_space = domain.space.subsurface
 
 infile_path = ClimaLand.Artifacts.topmodel_data_path()
 f_max = SpaceVaryingInput(infile_path, "fmax", surface_space; regridder_type)
-mask = SpaceVaryingInput(
-    infile_path,
-    "landsea_mask",
-    surface_space;
-    regridder_type,
-)
-
-oceans_to_zero(field, mask) = mask > 0.5 ? field : eltype(field)(0)
 f_over = FT(3.28) # 1/m
 R_sb = FT(1.484e-4 / 1000) # m/s
 runoff_model = ClimaLand.Soil.Runoff.TOPMODELRunoff{FT}(;
@@ -68,18 +60,21 @@ runoff_model = ClimaLand.Soil.Runoff.TOPMODELRunoff{FT}(;
 )
 soil_params_artifact_path =
     ClimaLand.Artifacts.soil_params_artifact_folder_path(; context)
-
 extrapolation_bc =
     (Interpolations.Periodic(), Interpolations.Flat(), Interpolations.Flat())
-# We use this mask to set values of these parameters over the ocean, in order
-# to keep them in the physical range
-function mask_vg(var, value)
-    if var < 1e-8
-        return value
-    else
-        return var
-    end
-end
+soil_params_mask = SpaceVaryingInput(
+        joinpath(
+            soil_params_artifact_path,
+            "vGalpha_map_gupta_etal2020_2.5x2.5x4.nc",
+        ),
+        "α",
+        subsurface_space;
+        regridder_type,
+        regridder_kwargs = (; extrapolation_bc,),
+        file_reader_kwargs = (; preprocess_func = (data) -> data > 0,),
+    )
+oceans_to_value(field, mask, value) = mask == 1.0 ? field : eltype(field)(value)    
+
 vg_α = SpaceVaryingInput(
     joinpath(
         soil_params_artifact_path,
@@ -90,16 +85,6 @@ vg_α = SpaceVaryingInput(
     regridder_type,
     regridder_kwargs = (; extrapolation_bc,),
 )
-vg_α .= mask_vg.(vg_α, 1e-3)
-# We use this mask to set values of this parameter over the ocean, in order
-# to keep it in the physical range
-function mask_vg_n(var, value)
-    if var < 1
-        return value
-    else
-        return var
-    end
-end
 vg_n = SpaceVaryingInput(
     joinpath(soil_params_artifact_path, "vGn_map_gupta_etal2020_2.5x2.5x4.nc"),
     "n",
@@ -107,7 +92,14 @@ vg_n = SpaceVaryingInput(
     regridder_type,
     regridder_kwargs = (; extrapolation_bc,),
 )
-vg_n .= mask_vg_n.(vg_n, 1.001)
+x  = parent(vg_α)
+μ = mean(log10.(x[x .>0]))
+vg_α .= oceans_to_value.(vg_α, soil_params_mask, 10.0^μ)
+
+x  = parent(vg_n)
+μ = mean(x[x .>0])
+vg_n .= oceans_to_value.(vg_n, soil_params_mask, μ)
+
 vg_fields_to_hcm_field(α::FT, n::FT) where {FT} =
     ClimaLand.Soil.vanGenuchten{FT}(; @NamedTuple{α::FT, n::FT}((α, n))...)
 hydrology_cm = vg_fields_to_hcm_field.(vg_α, vg_n)
@@ -133,7 +125,6 @@ hydrology_cm = vg_fields_to_hcm_field.(vg_α, vg_n)
     regridder_type,
     regridder_kwargs = (; extrapolation_bc,),
 )
-ν .= mask_vg.(ν, 1.0)
 K_sat = SpaceVaryingInput(
     joinpath(soil_params_artifact_path, "ksat_map_gupta_etal2020_2.5x2.5x4.nc"),
     "Ksat",
@@ -141,7 +132,16 @@ K_sat = SpaceVaryingInput(
     regridder_type,
     regridder_kwargs = (; extrapolation_bc,),
 )
-S_s = ClimaCore.Fields.zeros(subsurface_space) .+ FT(1e-3)
+
+x  = parent(K_sat)
+μ = mean(log10.(x[x .>0]))
+K_sat .= oceans_to_value.(K_sat, soil_params_mask, 10.0^μ)
+
+ν .= oceans_to_value.(ν, soil_params_mask, 1)
+
+θ_r .= oceans_to_value.(θ_r, soil_params_mask, 0)
+
+S_s = oceans_to_value.(ClimaCore.Fields.zeros(subsurface_space) .+ FT(1e-3), soil_params_mask, 1)
 
 soil_params = ClimaLand.Soil.RichardsParameters(;
     hydrology_cm = hydrology_cm,
@@ -212,7 +212,7 @@ t0 = 0.0
 tf = 3600.0 * 24 * 2
 dt = 1800.0
 Y.soil.ϑ_l .= hydrostatic_profile.(lat, z, ν, θ_r, vg_α, vg_n, S_s, f_max)
-@. Y.soil.ϑ_l = oceans_to_zero(Y.soil.ϑ_l, mask)
+@. Y.soil.ϑ_l = oceans_to_value(Y.soil.ϑ_l, soil_params_mask, 0.0)
 set_initial_cache! = make_set_initial_cache(model)
 exp_tendency! = make_exp_tendency(model);
 imp_tendency! = ClimaLand.make_imp_tendency(model);

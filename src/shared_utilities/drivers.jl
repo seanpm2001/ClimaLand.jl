@@ -155,11 +155,13 @@ function compute_ρ_sfc(thermo_params, ts_in, T_sfc)
     T_int = Thermodynamics.air_temperature(thermo_params, ts_in)
     Rm_int = Thermodynamics.gas_constant_air(thermo_params, ts_in)
     ρ_air = Thermodynamics.air_density(thermo_params, ts_in)
-    ρ_sfc =
-        ρ_air *
-        (T_sfc / T_int)^(Thermodynamics.cv_m(thermo_params, ts_in) / Rm_int)
-    return ρ_sfc
+    return ρ_air
 end
+
+#        ρ_sfc =
+#            ρ_air * (T_sfc / T_int)^(Thermodynamics.cv_m(thermo_params, ts_in) / Rm_int)
+#        return ρ_sfc
+
 
 """
     set_atmos_ts!(ts_in, atmos::PrescribedAtmosphere{FT}, p)

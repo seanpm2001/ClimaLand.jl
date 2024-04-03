@@ -66,6 +66,7 @@ function LP.LandParameters(toml_dict::CP.AbstractTOMLDict)
         insol_params,
     )
 end
+Base.broadcastable(ps::LP.LandParameters) = tuple(ps)
 
 """
     AutotrophicRespirationParameters(FT; kwargs...)
@@ -297,10 +298,10 @@ function EnergyHydrologyParameters(
     K_sat::F,
     S_s::F,
     θ_r::F,
-    PAR_albedo = 0.2,
-    NIR_albedo = 0.4,
+    PAR_albedo::SF = 0.2,
+    NIR_albedo::SF = 0.4,
     kwargs...,
-) where {F <: Union{<:AbstractFloat, ClimaCore.Fields.FieldVector}, C}
+) where {F <: Union{<:AbstractFloat, ClimaCore.Fields.Field}, SF <: Union{<:AbstractFloat, ClimaCore.Fields.Field}, C}
     earth_param_set = LP.LandParameters(toml_dict)
 
     # Obtain parameters needed to calculate the derived parameters
@@ -360,7 +361,7 @@ function EnergyHydrologyParameters(
     parameters = CP.get_parameter_values(toml_dict, name_map, "Land")
     PSE = typeof(earth_param_set)
     FT = CP.float_type(toml_dict)
-    EnergyHydrologyParameters{FT, F, C, PSE}(;
+    EnergyHydrologyParameters{FT, F, SF, C, PSE}(;
         PAR_albedo,
         NIR_albedo,
         ν,

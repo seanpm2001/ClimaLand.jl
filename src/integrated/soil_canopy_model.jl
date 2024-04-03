@@ -96,8 +96,10 @@ function SoilCanopyModel{FT}(;
             ClimaLand.coordinates(soil_args.domain).subsurface,
         ),
     )
-    sources = (RootExtraction{FT}(), Soil.PhaseChange{FT}(Δz))
-    # add heat BC
+    #sources = (RootExtraction{FT}(), Soil.PhaseChange{FT}(Δz))
+    sources = (Soil.PhaseChange{FT}(Δz),)
+
+    # How to use TOPMODEL runoff?
     top_bc =
         ClimaLand.Soil.AtmosDrivenFluxBC(atmos, CanopyRadiativeFluxes{FT}())
     zero_flux = Soil.HeatFluxBC((p, t) -> 0.0)
@@ -115,7 +117,7 @@ function SoilCanopyModel{FT}(;
     )
 
     transpiration = Canopy.PlantHydraulics.DiagnosticTranspiration{FT}()
-    soil_driver = PrognosticSoil{FT}(
+    soil_driver = PrognosticSoil{typeof(soil.parameters.PAR_albedo)}(
         soil.parameters.PAR_albedo,
         soil.parameters.NIR_albedo,
     )
@@ -281,7 +283,7 @@ function make_update_boundary_fluxes(
         @. p.root_energy_extraction =
             p.root_extraction * ClimaLand.Soil.volumetric_internal_energy_liq(
                 p.soil.T,
-                land.soil.parameters,
+                land.soil.parameters.earth_param_set,
             )
 
         # Radiation
@@ -357,7 +359,10 @@ function lsm_radiant_energy_fluxes!(
     R_net_soil = p.soil.R_n
     LW_out = p.LW_out
     SW_out = p.SW_out
-
+    LAI = p.canopy.hydraulics.area_index.leaf
+    SAI = p.canopy.hydraulics.area_index.stem
+    δ_veg = @. ClimaLand.heaviside(LAI + SAI - 0.05) # multiply this by ϵ_canopy to account for zero canopy case
+    ϵ_canopy = ϵ_canopy .* δ_veg
     # in total: INC - OUT = CANOPY_ABS + (1-α_soil)*CANOPY_TRANS
     # SW out  = reflected par + reflected nir
     @. SW_out =
@@ -436,11 +441,12 @@ Concrete type of AbstractSoilDriver used for dispatch in cases where both
 a canopy model and soil model are run.
 $(DocStringExtensions.FIELDS)
 """
-struct PrognosticSoil{FT} <: AbstractSoilDriver
+struct PrognosticSoil{F <: Union{AbstractFloat, ClimaCore.Fields.Field}} <:
+       AbstractSoilDriver
     "Soil albedo for PAR"
-    α_PAR::FT
+    α_PAR::F
     "Soil albedo for NIR"
-    α_NIR::FT
+    α_NIR::F
 end
 
 function Canopy.ground_albedo_PAR(soil_driver::PrognosticSoil, Y, p, t)
@@ -487,12 +493,12 @@ end
 """
     root_energy_flux_per_ground_area!(
         fa_energy::ClimaCore.Fields.Field,
-        s::PrognosticSoil{FT},
+        s::PrognosticSoil{F},
         model::Canopy.AbstractCanopyEnergyModel{FT},
         Y::ClimaCore.Fields.FieldVector,
         p::NamedTuple,
         t,
-    ) where {FT}
+    ) where {FT, F}
 
 
 A method computing the energy flux associated with the root-soil
@@ -508,12 +514,12 @@ must account for it as well.
 """
 function Canopy.root_energy_flux_per_ground_area!(
     fa_energy::ClimaCore.Fields.Field,
-    s::PrognosticSoil{FT},
+    s::PrognosticSoil{F},
     model::Canopy.AbstractCanopyEnergyModel{FT},
     Y::ClimaCore.Fields.FieldVector,
     p::NamedTuple,
     t,
-) where {FT}
+) where {FT, F}
     ClimaCore.Operators.column_integral_definite!(
         fa_energy,
         p.root_energy_extraction,
@@ -560,7 +566,7 @@ end
 
 """
     Canopy.canopy_radiant_energy_fluxes!(p::NamedTuple,
-                                         s::PrognosticSoil{FT},
+                                         s::PrognosticSoil{F},
                                          canopy,
                                          radiation::PrescribedRadiativeFluxes,
                                          earth_param_set::PSE,
@@ -580,13 +586,13 @@ and `p.canopy.radiative_transfer.SW_n`.
 """
 function Canopy.canopy_radiant_energy_fluxes!(
     p::NamedTuple,
-    s::PrognosticSoil{FT},
+    s::PrognosticSoil{F},
     canopy,
     radiation::PrescribedRadiativeFluxes,
     earth_param_set::PSE,
     Y::ClimaCore.Fields.FieldVector,
     t,
-) where {FT, PSE}
+) where {F, PSE}
     nothing
 end
 

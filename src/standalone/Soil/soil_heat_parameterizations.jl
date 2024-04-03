@@ -46,9 +46,11 @@ function phase_change_source(
     θ_i::FT,
     T::FT,
     τ::FT,
-    params::EnergyHydrologyParameters{FT},
-) where {FT}
-    (; ν, θ_r, hydrology_cm, earth_param_set) = params
+    ν::FT,
+    θ_r::FT,
+    hydrology_cm::C,
+    earth_param_set::EP
+) where {FT, EP,C}
     _ρ_i = FT(LP.ρ_cloud_ice(earth_param_set))
     _ρ_l = FT(LP.ρ_cloud_liq(earth_param_set))
     _LH_f0 = FT(LP.LH_f0(earth_param_set))
@@ -80,15 +82,16 @@ Compute the expression for volumetric heat capacity.
 function volumetric_heat_capacity(
     θ_l::FT,
     θ_i::FT,
-    parameters::EnergyHydrologyParameters{FT},
-) where {FT}
-    _ρ_i = FT(LP.ρ_cloud_ice(parameters.earth_param_set))
-    ρcp_i = FT(LP.cp_i(parameters.earth_param_set) * _ρ_i)
+    ρc_ds::FT,
+    earth_param_set::EP,
+) where {FT, EP}
+    _ρ_i = FT(LP.ρ_cloud_ice(earth_param_set))
+    ρcp_i = FT(LP.cp_i(earth_param_set) * _ρ_i)
 
-    _ρ_l = FT(LP.ρ_cloud_liq(parameters.earth_param_set))
-    ρcp_l = FT(LP.cp_l(parameters.earth_param_set) * _ρ_l)
+    _ρ_l = FT(LP.ρ_cloud_liq(earth_param_set))
+    ρcp_l = FT(LP.cp_l(earth_param_set) * _ρ_l)
 
-    ρc_s = parameters.ρc_ds + θ_l * ρcp_l + θ_i * ρcp_i
+    ρc_s = ρc_ds + θ_l * ρcp_l + θ_i * ρcp_i
     return ρc_s
 end
 """
@@ -103,12 +106,12 @@ function temperature_from_ρe_int(
     ρe_int::FT,
     θ_i::FT,
     ρc_s::FT,
-    parameters::EnergyHydrologyParameters{FT},
-) where {FT}
+    earth_param_set::EP,
+) where {FT,EP}
 
-    _ρ_i = FT(LP.ρ_cloud_ice(parameters.earth_param_set))
-    _T_ref = FT(LP.T_0(parameters.earth_param_set))
-    _LH_f0 = FT(LP.LH_f0(parameters.earth_param_set))
+    _ρ_i = FT(LP.ρ_cloud_ice(earth_param_set))
+    _T_ref = FT(LP.T_0(earth_param_set))
+    _LH_f0 = FT(LP.LH_f0(earth_param_set))
     T = _T_ref + (ρe_int + θ_i * _ρ_i * _LH_f0) / ρc_s
     return T
 end
@@ -124,11 +127,11 @@ function volumetric_internal_energy(
     θ_i::FT,
     ρc_s::FT,
     T::FT,
-    parameters::EnergyHydrologyParameters{FT},
-) where {FT}
-    _ρ_i = FT(LP.ρ_cloud_ice(parameters.earth_param_set))
-    _LH_f0 = FT(LP.LH_f0(parameters.earth_param_set))
-    _T_ref = FT(LP.T_0(parameters.earth_param_set))
+    earth_param_set::EP,
+) where {FT, EP}
+    _ρ_i = FT(LP.ρ_cloud_ice(earth_param_set))
+    _LH_f0 = FT(LP.LH_f0(earth_param_set))
+    _T_ref = FT(LP.T_0(earth_param_set))
     ρe_int = ρc_s * (T - _T_ref) - θ_i * _ρ_i * _LH_f0
     return ρe_int
 end
@@ -142,12 +145,12 @@ of the liquid water in the soil, given the temperature T.
 """
 function volumetric_internal_energy_liq(
     T::FT,
-    parameters::EnergyHydrologyParameters{FT},
-) where {FT}
+    earth_param_set::EP,
+) where {FT, EP}
 
-    _T_ref = FT(LP.T_0(parameters.earth_param_set))
-    _ρ_l = FT(LP.ρ_cloud_liq(parameters.earth_param_set))
-    ρcp_l = FT(LP.cp_l(parameters.earth_param_set) * _ρ_l)
+    _T_ref = FT(LP.T_0(earth_param_set))
+    _ρ_l = FT(LP.ρ_cloud_liq(earth_param_set))
+    ρcp_l = FT(LP.cp_l(earth_param_set) * _ρ_l)
     ρe_int_l = ρcp_l * (T - _T_ref)
     return ρe_int_l
 end
@@ -219,14 +222,12 @@ and Arp model.
 function kersten_number(
     θ_i::FT,
     S_r::FT,
-    parameters::EnergyHydrologyParameters{FT},
+    α::FT,
+    β::FT,
+    ν_ss_om::FT,
+    ν_ss_quartz::FT,
+    ν_ss_gravel::FT,
 ) where {FT}
-    α = parameters.α
-    β = parameters.β
-    ν_ss_om = parameters.ν_ss_om
-    ν_ss_quartz = parameters.ν_ss_quartz
-    ν_ss_gravel = parameters.ν_ss_gravel
-
     if θ_i < eps(FT)
         K_e =
             S_r^((FT(1) + ν_ss_om - α * ν_ss_quartz - ν_ss_gravel) / FT(2)) *

@@ -12,6 +12,7 @@ $(DocStringExtensions.FIELDS)
 Base.@kwdef struct EnergyHydrologyParameters{
     FT <: AbstractFloat,
     F <: Union{<:AbstractFloat, ClimaCore.Fields.Field},
+    SF <: Union{<:AbstractFloat, ClimaCore.Fields.Field},
     C,
     PSE,
 }
@@ -50,9 +51,9 @@ Base.@kwdef struct EnergyHydrologyParameters{
     "Reference temperature for the viscosity factor"
     γT_ref::FT
     "Soil PAR Albedo"
-    PAR_albedo::F
+    PAR_albedo::SF
     "Soil NIR Albedo"
-    NIR_albedo::F
+    NIR_albedo::SF
     "Soil Emissivity"
     emissivity::FT
     "Roughness length for momentum"
@@ -196,13 +197,12 @@ function ClimaLand.make_compute_exp_tendency(
             top = Operators.SetValue(Geometry.WVector.(heat_top_flux_bc)),
             bottom = Operators.SetValue(Geometry.WVector.(heat_bottom_flux_bc)),
         )
-        ρe_int_l = volumetric_internal_energy_liq.(p.soil.T, model.parameters)
 
         # GradC2F returns a Covariant3Vector, so no need to convert.
         @. dY.soil.ρe_int =
             -divf2c_heat(
                 -interpc2f(p.soil.κ) * gradc2f(p.soil.T) -
-                interpc2f(ρe_int_l * p.soil.K) * gradc2f(p.soil.ψ + z),
+                interpc2f(volumetric_internal_energy_liq(p.soil.T, model.parameters.earth_param_set) * p.soil.K) * gradc2f(p.soil.ψ + z),
             )
         # Horizontal contributions
         horizontal_components!(
@@ -379,11 +379,11 @@ function horizontal_components!(
     hgrad = Operators.Gradient()
     # The flux is already covariant, from hgrad, so no need to convert.
     @. dY.soil.ϑ_l += -hdiv(-p.soil.K * hgrad(p.soil.ψ + z))
-    ρe_int_l = volumetric_internal_energy_liq.(p.soil.T, model.parameters)
+
     @. dY.soil.ρe_int +=
         -hdiv(
             -p.soil.κ * hgrad(p.soil.T) -
-            p.soil.K * ρe_int_l * hgrad(p.soil.ψ + z),
+            p.soil.K * volumetric_internal_energy_liq(p.soil.T, model.parameters.earth_param_set) * hgrad(p.soil.ψ + z),
         )
 end
 
@@ -484,9 +484,16 @@ function ClimaLand.make_update_aux(model::EnergyHydrology)
             θ_r,
             Ω,
             γ,
+            α,
+            β,
+            ν_ss_om,
+            ν_ss_gravel,
+            ν_ss_quartz,
             γT_ref,
             κ_sat_frozen,
             κ_sat_unfrozen,
+            ρc_ds,
+            earth_param_set
         ) = model.parameters
 
         @. p.soil.θ_l =
@@ -497,7 +504,11 @@ function ClimaLand.make_update_aux(model::EnergyHydrology)
             kersten_number(
                 Y.soil.θ_i,
                 relative_saturation(p.soil.θ_l, Y.soil.θ_i, ν),
-                model.parameters,
+                α,
+                β,
+                ν_ss_om,
+                ν_ss_quartz,
+                ν_ss_gravel,
             ),
             κ_sat(p.soil.θ_l, Y.soil.θ_i, κ_sat_unfrozen, κ_sat_frozen),
         )
@@ -505,8 +516,8 @@ function ClimaLand.make_update_aux(model::EnergyHydrology)
         @. p.soil.T = temperature_from_ρe_int(
             Y.soil.ρe_int,
             Y.soil.θ_i,
-            volumetric_heat_capacity(p.soil.θ_l, Y.soil.θ_i, model.parameters),
-            model.parameters,
+            volumetric_heat_capacity(p.soil.θ_l, Y.soil.θ_i, ρc_ds, earth_param_set),
+            earth_param_set,
         )
 
         @. p.soil.K =
@@ -552,14 +563,19 @@ function ClimaLand.source!(
     model,
 ) where {FT}
     params = model.parameters
-    (; ν, earth_param_set) = params
+    (; ν, ρc_ds, θ_r, hydrology_cm, earth_param_set) = params
     _ρ_l = FT(LP.ρ_cloud_liq(earth_param_set))
     _ρ_i = FT(LP.ρ_cloud_ice(earth_param_set))
-    ρc = volumetric_heat_capacity.(p.soil.θ_l, Y.soil.θ_i, params)
-    τ = thermal_time.(ρc, src.Δz, p.soil.κ)
 
     liquid_source =
-        phase_change_source.(p.soil.θ_l, Y.soil.θ_i, p.soil.T, τ, params)
+        @. phase_change_source(p.soil.θ_l,
+                             Y.soil.θ_i,
+                             p.soil.T,
+                             thermal_time(volumetric_heat_capacity(p.soil.θ_l, Y.soil.θ_i, ρc_ds, earth_param_set), src.Δz, p.soil.κ),
+                             ν,
+                             θ_r,
+                             hydrology_cm,
+                             earth_param_set)
     @. dY.soil.ϑ_l += -liquid_source
     @. dY.soil.θ_i += (_ρ_l / _ρ_i) * liquid_source
 end
@@ -650,15 +666,21 @@ function ClimaLand.surface_resistance(
     t,
 ) where {FT}
     cds = ClimaCore.Fields.coordinate_field(model.domain.space.subsurface)
-    (; ν, θ_r, hydrology_cm) = model.parameters
-    θ_l_sfc = p.soil.sfc_scratch
-    ClimaLand.Domains.linear_interpolation_to_surface!(
-        θ_l_sfc,
-        p.soil.θ_l,
-        cds.z,
-    )
-    θ_i_sfc = ClimaLand.Domains.top_center_to_surface(Y.soil.θ_i)
-    return ClimaLand.Soil.soil_resistance.(θ_l_sfc, θ_i_sfc, model.parameters)
+    (; ν, θ_r, d_ds, earth_param_set, hydrology_cm) = model.parameters
+    resistance = p.soil.sfc_scratch
+    return ClimaLand.Domains.linear_interpolation_to_surface!(resistance,
+                                                              ClimaLand.Soil.soil_resistance.(
+                                                                  p.soil.θ_l,
+                                                                  Y.soil.ϑ_l,
+                                                                  Y.soil.θ_i,
+                                                                  hydrology_cm,
+                                                                  ν,
+                                                                  θ_r,
+                                                                  d_ds,
+                                                                 earth_param_set
+                                                              ),
+                                                              cds.z
+                                                              )
 end
 
 """

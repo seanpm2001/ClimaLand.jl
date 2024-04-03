@@ -328,6 +328,25 @@ end
 
 
 """
+    update_canopy_prescribed_field!(component::PlantHydraulics{FT},
+                                    p,
+                                    t,
+                                    ) where {FT}
+
+Updates the canopy prescribed fields pertaining to the PlantHydraulics
+component (the LAI only in this case) with their values at time t.
+"""
+function ClimaLand.Canopy.update_canopy_prescribed_field!(
+    component::PlantHydraulicsModel{FT},
+    p,
+    t,
+) where {FT}
+    (; LAIfunction) = component.parameters.ai_parameterization
+    evaluate!(p.canopy.hydraulics.area_index.leaf, LAIfunction, floor(t))
+end
+
+
+"""
     flux(
         z1,
         z2,
@@ -544,6 +563,7 @@ function make_compute_exp_tendency(
         # for broadcasted expressions using the macro @.
         # field.:($index) .= value # works
         # @ field.:($$index) = value # works
+        
         @inbounds for i in 1:(n_stem + n_leaf)
             im1 = i - 1
             ip1 = i + 1
@@ -565,6 +585,7 @@ function make_compute_exp_tendency(
                     1 / AIdz * (fa.:($$im1) - fa.:($$i))
             end
         end
+        
     end
     return compute_exp_tendency!
 end

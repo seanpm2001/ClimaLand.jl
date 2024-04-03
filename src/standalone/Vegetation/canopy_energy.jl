@@ -28,6 +28,13 @@ No equation for the energy of the canopy is solved.
 """
 struct PrescribedCanopyTempModel{FT} <: AbstractCanopyEnergyModel{FT} end
 
+function lai_clip_T(AI::FT, T_c::FT, T_air::FT) where {FT}
+    if AI > eps(FT)
+        T_c
+    else
+        T_air
+    end
+end
 """
     canopy_temperature(model::PrescribedCanopyTempModel, canopy, Y, p, t)
 
@@ -84,8 +91,10 @@ ClimaLand.prognostic_domain_names(model::BigLeafEnergyModel) = (:surface,)
 Returns the canopy temperature under the `BigLeafEnergyModel` model,
 where the canopy temperature is modeled prognostically.
 """
-canopy_temperature(model::BigLeafEnergyModel, canopy, Y, p, t) =
+function canopy_temperature(model::BigLeafEnergyModel, canopy, Y, p, t)
     Y.canopy.energy.T
+    #@. lai_clip_T(p.canopy.hydraulics.area_index.leaf + p.canopy.hydraulics.area_index.stem, Y.canopy.energy.T, p.drivers.T)
+end
 
 function make_compute_exp_tendency(
     model::BigLeafEnergyModel{FT},
@@ -99,9 +108,6 @@ function make_compute_exp_tendency(
         # or( ac_canopy AI)∂T∂t = -∑F
         # where ∑F = F_sfc - F_bot, and both F_sfc and F_bot are per
         # unit area ground [W/m^2].
-        # Because they are per unit area ground, we need the factor of
-        # area index on the LHF, as ac_canopy [J/m^2/K]
-        # is per unit area plant.
 
         net_energy_flux = @. -p.canopy.radiative_transfer.LW_n -
            p.canopy.radiative_transfer.SW_n +
@@ -110,9 +116,8 @@ function make_compute_exp_tendency(
 
         # To prevent dividing by zero, change AI" to
         # "max(AI, eps(FT))"
-        c_per_ground_area =
-            @. ac_canopy * max(area_index.leaf + area_index.stem, eps(FT))
-        @. dY.canopy.energy.T = -net_energy_flux / c_per_ground_area
+        c_per_ground_area = @. ac_canopy * max(area_index.leaf + area_index.stem, eps(FT))
+        @. dY.canopy.energy.T = -net_energy_flux / c_per_ground_area 
     end
     return compute_exp_tendency!
 end
