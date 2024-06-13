@@ -49,8 +49,8 @@ function phase_change_source(
     ν::FT,
     θ_r::FT,
     hydrology_cm::C,
-    earth_param_set::EP
-) where {FT, EP,C}
+    earth_param_set::EP,
+) where {FT, EP, C}
     _ρ_i = FT(LP.ρ_cloud_ice(earth_param_set))
     _ρ_l = FT(LP.ρ_cloud_liq(earth_param_set))
     _LH_f0 = FT(LP.LH_f0(earth_param_set))
@@ -107,7 +107,7 @@ function temperature_from_ρe_int(
     θ_i::FT,
     ρc_s::FT,
     earth_param_set::EP,
-) where {FT,EP}
+) where {FT, EP}
 
     _ρ_i = FT(LP.ρ_cloud_ice(earth_param_set))
     _T_ref = FT(LP.T_0(earth_param_set))

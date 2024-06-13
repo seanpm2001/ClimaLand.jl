@@ -301,7 +301,11 @@ function EnergyHydrologyParameters(
     PAR_albedo::SF = 0.2,
     NIR_albedo::SF = 0.4,
     kwargs...,
-) where {F <: Union{<:AbstractFloat, ClimaCore.Fields.Field}, SF <: Union{<:AbstractFloat, ClimaCore.Fields.Field}, C}
+) where {
+    F <: Union{<:AbstractFloat, ClimaCore.Fields.Field},
+    SF <: Union{<:AbstractFloat, ClimaCore.Fields.Field},
+    C,
+}
     earth_param_set = LP.LandParameters(toml_dict)
 
     # Obtain parameters needed to calculate the derived parameters

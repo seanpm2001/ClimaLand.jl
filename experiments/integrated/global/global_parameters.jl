@@ -39,17 +39,17 @@ soil_params_artifact_path = "/groups/esm/ClimaArtifacts/artifacts/soil_params_Gu
 extrapolation_bc =
     (Interpolations.Periodic(), Interpolations.Flat(), Interpolations.Flat())
 soil_params_mask = SpaceVaryingInput(
-        joinpath(
-            soil_params_artifact_path,
-            "vGalpha_map_gupta_etal2020_2.5x2.5x4.nc",
-        ),
-        "α",
-        subsurface_space;
-        regridder_type,
-        regridder_kwargs = (; extrapolation_bc,),
-        file_reader_kwargs = (; preprocess_func = (data) -> data > 0,),
-    )
-oceans_to_value(field, mask, value) = mask == 1.0 ? field : eltype(field)(value)    
+    joinpath(
+        soil_params_artifact_path,
+        "vGalpha_map_gupta_etal2020_2.5x2.5x4.nc",
+    ),
+    "α",
+    subsurface_space;
+    regridder_type,
+    regridder_kwargs = (; extrapolation_bc,),
+    file_reader_kwargs = (; preprocess_func = (data) -> data > 0,),
+)
+oceans_to_value(field, mask, value) = mask == 1.0 ? field : eltype(field)(value)
 
 vg_α = SpaceVaryingInput(
     joinpath(
@@ -68,12 +68,12 @@ vg_n = SpaceVaryingInput(
     regridder_type,
     regridder_kwargs = (; extrapolation_bc,),
 )
-x  = parent(vg_α)
-μ = mean(log10.(x[x .>0]))
+x = parent(vg_α)
+μ = mean(log10.(x[x .> 0]))
 vg_α .= oceans_to_value.(vg_α, soil_params_mask, 10.0^μ)
 
-x  = parent(vg_n)
-μ = mean(x[x .>0])
+x = parent(vg_n)
+μ = mean(x[x .> 0])
 vg_n .= oceans_to_value.(vg_n, soil_params_mask, μ)
 
 vg_fields_to_hcm_field(α::FT, n::FT) where {FT} =
@@ -109,8 +109,8 @@ K_sat = SpaceVaryingInput(
     regridder_kwargs = (; extrapolation_bc,),
 )
 
-x  = parent(K_sat)
-μ = mean(log10.(x[x .>0]))
+x = parent(K_sat)
+μ = mean(log10.(x[x .> 0]))
 K_sat .= oceans_to_value.(K_sat, soil_params_mask, 10.0^μ)
 
 ν .= oceans_to_value.(ν, soil_params_mask, 1)
@@ -118,10 +118,30 @@ K_sat .= oceans_to_value.(K_sat, soil_params_mask, 10.0^μ)
 θ_r .= oceans_to_value.(θ_r, soil_params_mask, 0)
 
 
-S_s = oceans_to_value.(ClimaCore.Fields.zeros(subsurface_space) .+ FT(1e-3), soil_params_mask, 1)
-ν_ss_om = oceans_to_value.(ClimaCore.Fields.zeros(subsurface_space) .+ FT(0.1), soil_params_mask, 0)
-ν_ss_quartz = oceans_to_value.(ClimaCore.Fields.zeros(subsurface_space) .+ FT(0.1),soil_params_mask, 0)
-ν_ss_gravel = oceans_to_value.(ClimaCore.Fields.zeros(subsurface_space) .+ FT(0.1),soil_params_mask, 0)
+S_s =
+    oceans_to_value.(
+        ClimaCore.Fields.zeros(subsurface_space) .+ FT(1e-3),
+        soil_params_mask,
+        1,
+    )
+ν_ss_om =
+    oceans_to_value.(
+        ClimaCore.Fields.zeros(subsurface_space) .+ FT(0.1),
+        soil_params_mask,
+        0,
+    )
+ν_ss_quartz =
+    oceans_to_value.(
+        ClimaCore.Fields.zeros(subsurface_space) .+ FT(0.1),
+        soil_params_mask,
+        0,
+    )
+ν_ss_gravel =
+    oceans_to_value.(
+        ClimaCore.Fields.zeros(subsurface_space) .+ FT(0.1),
+        soil_params_mask,
+        0,
+    )
 PAR_albedo = ClimaCore.Fields.zeros(surface_space) .+ FT(0.2)
 NIR_albedo = ClimaCore.Fields.zeros(surface_space) .+ FT(0.2)
 soil_params = Soil.EnergyHydrologyParameters(

@@ -359,10 +359,6 @@ function lsm_radiant_energy_fluxes!(
     R_net_soil = p.soil.R_n
     LW_out = p.LW_out
     SW_out = p.SW_out
-    LAI = p.canopy.hydraulics.area_index.leaf
-    SAI = p.canopy.hydraulics.area_index.stem
-    δ_veg = @. ClimaLand.heaviside(LAI + SAI - 0.05) # multiply this by ϵ_canopy to account for zero canopy case
-    ϵ_canopy = ϵ_canopy .* δ_veg
     # in total: INC - OUT = CANOPY_ABS + (1-α_soil)*CANOPY_TRANS
     # SW out  = reflected par + reflected nir
     @. SW_out =

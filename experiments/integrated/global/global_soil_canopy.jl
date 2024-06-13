@@ -155,15 +155,10 @@ function zenith_angle(
             )
         )
 
-        Insolation.instantaneous_zenith_angle.(
-            d,
-            δ,
-            η_UTC,
-            longitude,
-            latitude,
-        ).:1
+    Insolation.instantaneous_zenith_angle.(d, δ, η_UTC, longitude, latitude).:1
 end
-radiation = PrescribedRadiativeFluxes(FT, SW_d, LW_d, ref_time; θs = zenith_angle);
+radiation =
+    PrescribedRadiativeFluxes(FT, SW_d, LW_d, ref_time; θs = zenith_angle);
 
 include("./global_parameters.jl")
 soil_args = (domain = domain, parameters = soil_params)
@@ -236,9 +231,12 @@ LAIfunction = TimeVaryingInput(
     reference_date = ref_time,
     t_start,
     regridder_type,
-    file_reader_kwargs = (; preprocess_func = (data) -> data > 0.05 ? data : 0.0,),
+    file_reader_kwargs = (;
+        preprocess_func = (data) -> data > 0.05 ? data : 0.0,
+    ),
 )
-ai_parameterization = Canopy.PrescribedSiteAreaIndex{FT}(LAIfunction, SAI, f_root_to_shoot)
+ai_parameterization =
+    Canopy.PrescribedSiteAreaIndex{FT}(LAIfunction, SAI, f_root_to_shoot)
 
 function root_distribution(z::T; rooting_depth = rooting_depth) where {T}
     return T(1.0 / rooting_depth) * exp(z / T(rooting_depth)) # 1/m
@@ -304,13 +302,24 @@ t0 = 0.0
 dt = 180.0
 tf = 3600 * 24.0
 
-init_soil(ν, θ_r) = θ_r + (ν - θ_r)/2
+init_soil(ν, θ_r) = θ_r + (ν - θ_r) / 2
 Y.soil.ϑ_l .= init_soil.(ν, θ_r)
 Y.soil.θ_i .= FT(0.0)
 T = FT(276.85)
-ρc_s = Soil.volumetric_heat_capacity.(Y.soil.ϑ_l, Y.soil.θ_i, soil_params.ρc_ds, soil_params.earth_param_set)
+ρc_s =
+    Soil.volumetric_heat_capacity.(
+        Y.soil.ϑ_l,
+        Y.soil.θ_i,
+        soil_params.ρc_ds,
+        soil_params.earth_param_set,
+    )
 Y.soil.ρe_int .=
-        Soil.volumetric_internal_energy.(Y.soil.θ_i, ρc_s, T, soil_params.earth_param_set)  
+    Soil.volumetric_internal_energy.(
+        Y.soil.θ_i,
+        ρc_s,
+        T,
+        soil_params.earth_param_set,
+    )
 Y.soilco2.C .= FT(0.000412) # set to atmospheric co2, mol co2 per mol air
 Y.canopy.hydraulics.ϑ_l.:1 .= plant_ν
 evaluate!(Y.canopy.energy.T, atmos.T, t0)
@@ -326,19 +335,19 @@ prob = SciMLBase.ODEProblem(
         T_exp! = exp_tendency!,
         dss! = ClimaLand.dss!,
         T_imp! = nothing,
-    ),  
-    Y,  
+    ),
+    Y,
     (t0, tf),
     p,
 );
 
-saveat = Array(t0:3600*3:tf)
+saveat = Array(t0:(3600 * 3):tf)
 sv = (;
     t = Array{Float64}(undef, length(saveat)),
     saveval = Array{NamedTuple}(undef, length(saveat)),
 )
 saving_cb = ClimaLand.NonInterpSavingCallback(sv, saveat)
-updateat = Array(t0:3600*3:tf)
+updateat = Array(t0:(3600 * 3):tf)
 updatefunc = ClimaLand.make_update_drivers(atmos, nothing)
 driver_cb = ClimaLand.DriverUpdateCallback(updateat, updatefunc)
 cb = SciMLBase.CallbackSet(driver_cb, saving_cb)
@@ -358,7 +367,9 @@ hcoords = [
     lat in reverse(latpts)
 ]
 remapper = ClimaCore.Remapping.Remapper(surface_space, hcoords)
-S = ClimaLand.Domains.top_center_to_surface((sol.u[4].soil.ϑ_l .- θ_r) ./ (ν .- θ_r))
+S = ClimaLand.Domains.top_center_to_surface(
+    (sol.u[4].soil.ϑ_l .- θ_r) ./ (ν .- θ_r),
+)
 S_ice = ClimaLand.Domains.top_center_to_surface(sol.u[4].soil.θ_i ./ ν)
 T_soil = ClimaLand.Domains.top_center_to_surface(sv.saveval[4].soil.T)
 SW = sv.saveval[4].drivers.SW_d
@@ -366,17 +377,21 @@ SW = sv.saveval[4].drivers.SW_d
 GPP = sv.saveval[4].canopy.photosynthesis.GPP .* 1e6
 T_canopy = sol.u[4].canopy.energy.T
 fields = [S, S_ice, T_soil, GPP, T_canopy, SW]
-titles = ["Effective saturation", "Effective ice saturation", "Temperature (K) - Soil", "GPP", "Temperature (K) - Canopy", "Incident SW"]
+titles = [
+    "Effective saturation",
+    "Effective ice saturation",
+    "Temperature (K) - Soil",
+    "GPP",
+    "Temperature (K) - Canopy",
+    "Incident SW",
+]
 plotnames = ["S", "Sice", "temp", "gpp", "temp_canopy", "sw"]
 mask_top = ClimaLand.Domains.top_center_to_surface(soil_params_mask)
 mask_remap = ClimaCore.Remapping.interpolate(remapper, mask_top)
 for (id, x) in enumerate(fields)
     title = titles[id]
     plotname = plotnames[id]
-    x_remap = ClimaCore.Remapping.interpolate(
-        remapper,
-        x,
-    )
+    x_remap = ClimaCore.Remapping.interpolate(remapper, x)
 
     fig = Figure(size = (600, 400))
     ax = Axis(
@@ -386,7 +401,13 @@ for (id, x) in enumerate(fields)
         title = title,
     )
     clims = extrema(x_remap)
-    CairoMakie.heatmap!(ax, longpts, latpts, oceans_to_value.(x_remap, mask_remap, 0.0), colorrange = clims)
+    CairoMakie.heatmap!(
+        ax,
+        longpts,
+        latpts,
+        oceans_to_value.(x_remap, mask_remap, 0.0),
+        colorrange = clims,
+    )
     Colorbar(fig[:, end + 1], colorrange = clims)
     outfile = joinpath(outdir, "$plotname.png")
     CairoMakie.save(outfile, fig)

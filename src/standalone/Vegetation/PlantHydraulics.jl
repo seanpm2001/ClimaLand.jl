@@ -563,7 +563,7 @@ function make_compute_exp_tendency(
         # for broadcasted expressions using the macro @.
         # field.:($index) .= value # works
         # @ field.:($$index) = value # works
-        
+
         @inbounds for i in 1:(n_stem + n_leaf)
             im1 = i - 1
             ip1 = i + 1
@@ -585,7 +585,7 @@ function make_compute_exp_tendency(
                     1 / AIdz * (fa.:($$im1) - fa.:($$i))
             end
         end
-        
+
     end
     return compute_exp_tendency!
 end

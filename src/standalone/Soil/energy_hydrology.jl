@@ -202,7 +202,12 @@ function ClimaLand.make_compute_exp_tendency(
         @. dY.soil.ρe_int =
             -divf2c_heat(
                 -interpc2f(p.soil.κ) * gradc2f(p.soil.T) -
-                interpc2f(volumetric_internal_energy_liq(p.soil.T, model.parameters.earth_param_set) * p.soil.K) * gradc2f(p.soil.ψ + z),
+                interpc2f(
+                    volumetric_internal_energy_liq(
+                        p.soil.T,
+                        model.parameters.earth_param_set,
+                    ) * p.soil.K,
+                ) * gradc2f(p.soil.ψ + z),
             )
         # Horizontal contributions
         horizontal_components!(
@@ -383,7 +388,12 @@ function horizontal_components!(
     @. dY.soil.ρe_int +=
         -hdiv(
             -p.soil.κ * hgrad(p.soil.T) -
-            p.soil.K * volumetric_internal_energy_liq(p.soil.T, model.parameters.earth_param_set) * hgrad(p.soil.ψ + z),
+            p.soil.K *
+            volumetric_internal_energy_liq(
+                p.soil.T,
+                model.parameters.earth_param_set,
+            ) *
+            hgrad(p.soil.ψ + z),
         )
 end
 
@@ -493,7 +503,7 @@ function ClimaLand.make_update_aux(model::EnergyHydrology)
             κ_sat_frozen,
             κ_sat_unfrozen,
             ρc_ds,
-            earth_param_set
+            earth_param_set,
         ) = model.parameters
 
         @. p.soil.θ_l =
@@ -516,7 +526,12 @@ function ClimaLand.make_update_aux(model::EnergyHydrology)
         @. p.soil.T = temperature_from_ρe_int(
             Y.soil.ρe_int,
             Y.soil.θ_i,
-            volumetric_heat_capacity(p.soil.θ_l, Y.soil.θ_i, ρc_ds, earth_param_set),
+            volumetric_heat_capacity(
+                p.soil.θ_l,
+                Y.soil.θ_i,
+                ρc_ds,
+                earth_param_set,
+            ),
             earth_param_set,
         )
 
@@ -567,15 +582,25 @@ function ClimaLand.source!(
     _ρ_l = FT(LP.ρ_cloud_liq(earth_param_set))
     _ρ_i = FT(LP.ρ_cloud_ice(earth_param_set))
 
-    liquid_source =
-        @. phase_change_source(p.soil.θ_l,
-                             Y.soil.θ_i,
-                             p.soil.T,
-                             thermal_time(volumetric_heat_capacity(p.soil.θ_l, Y.soil.θ_i, ρc_ds, earth_param_set), src.Δz, p.soil.κ),
-                             ν,
-                             θ_r,
-                             hydrology_cm,
-                             earth_param_set)
+    liquid_source = @. phase_change_source(
+        p.soil.θ_l,
+        Y.soil.θ_i,
+        p.soil.T,
+        thermal_time(
+            volumetric_heat_capacity(
+                p.soil.θ_l,
+                Y.soil.θ_i,
+                ρc_ds,
+                earth_param_set,
+            ),
+            src.Δz,
+            p.soil.κ,
+        ),
+        ν,
+        θ_r,
+        hydrology_cm,
+        earth_param_set,
+    )
     @. dY.soil.ϑ_l += -liquid_source
     @. dY.soil.θ_i += (_ρ_l / _ρ_i) * liquid_source
 end
@@ -668,19 +693,20 @@ function ClimaLand.surface_resistance(
     cds = ClimaCore.Fields.coordinate_field(model.domain.space.subsurface)
     (; ν, θ_r, d_ds, earth_param_set, hydrology_cm) = model.parameters
     resistance = p.soil.sfc_scratch
-    return ClimaLand.Domains.linear_interpolation_to_surface!(resistance,
-                                                              ClimaLand.Soil.soil_resistance.(
-                                                                  p.soil.θ_l,
-                                                                  Y.soil.ϑ_l,
-                                                                  Y.soil.θ_i,
-                                                                  hydrology_cm,
-                                                                  ν,
-                                                                  θ_r,
-                                                                  d_ds,
-                                                                 earth_param_set
-                                                              ),
-                                                              cds.z
-                                                              )
+    return ClimaLand.Domains.linear_interpolation_to_surface!(
+        resistance,
+        ClimaLand.Soil.soil_resistance.(
+            p.soil.θ_l,
+            Y.soil.ϑ_l,
+            Y.soil.θ_i,
+            hydrology_cm,
+            ν,
+            θ_r,
+            d_ds,
+            earth_param_set,
+        ),
+        cds.z,
+    )
 end
 
 """
