@@ -244,7 +244,6 @@ function canopy_turbulent_fluxes(
     d_sfc = ClimaLand.displacement_height(model, Y, p)
     u_air = p.drivers.u
     h_air = atmos.h
-
     return canopy_turbulent_fluxes_at_a_point.(
         T_sfc,
         q_sfc,
