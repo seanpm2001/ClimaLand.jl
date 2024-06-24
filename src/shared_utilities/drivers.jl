@@ -9,6 +9,7 @@ using StaticArrays
 import ..Parameters as LP
 export AbstractAtmosphericDrivers,
     AbstractRadiativeDrivers,
+    AbstractClimaLandDrivers,
     PrescribedAtmosphere,
     PrescribedPrecipitation,
     CoupledAtmosphere,
@@ -24,21 +25,29 @@ export AbstractAtmosphericDrivers,
     vapor_pressure_deficit,
     displacement_height,
     relative_humidity,
-    make_update_drivers
+    make_update_drivers,
+    initialize_drivers
 
 """
-     AbstractAtmosphericDrivers{FT <: AbstractFloat}
-
-An abstract type of atmospheric drivers of land models.
-"""
-abstract type AbstractAtmosphericDrivers{FT <: AbstractFloat} end
-
-"""
-     AbstractRadiativeDrivers{FT <: AbstractFloat}
+     AbstractClimaLandDrivers{FT <: AbstractFloat}
 
 An abstract type of radiative drivers of land models.
 """
-abstract type AbstractRadiativeDrivers{FT <: AbstractFloat} end
+abstract type AbstractClimaLandDrivers{FT <: AbstractFloat} end 
+
+"""
+     AbstractAtmosphericDrivers{FT}
+
+An abstract type of atmospheric drivers of land models.
+"""
+abstract type AbstractAtmosphericDrivers{FT} <: AbstractClimaLandDrivers{FT} end
+
+"""
+     AbstractRadiativeDrivers{FT}
+
+An abstract type of radiative drivers of land models.
+"""
+abstract type AbstractRadiativeDrivers{FT} <: AbstractClimaLandDrivers{FT}  end
 
 """
     PrescribedAtmosphere{FT, CA, DT} <: AbstractAtmosphericDrivers{FT}
@@ -759,67 +768,63 @@ function initialize_drivers(r::PrescribedRadiativeFluxes{FT}, coords) where {FT}
 end
 
 """
-    initialize_drivers(d::Union{AbstractAtmosphericDrivers, AbstractRadiativeDrivers, Nothing}, coords)
+    initialize_drivers(d::Union{AbstractClimaLandDrivers,, Nothing}, coords)
 
 Creates and returns a NamedTuple with `nothing` when no driver cache variables are needed.
 """
 function initialize_drivers(
-    d::Union{AbstractAtmosphericDrivers, AbstractRadiativeDrivers, Nothing},
+    d::Union{AbstractClimaLandDrivers, Nothing},
     coords,
 )
     return (;)
 end
 
 """
-    initialize_drivers(a::Union{AbstractAtmosphericDrivers, Nothing},
-                       r::Union{AbstractRadiativeDrivers, Nothing},
+    initialize_drivers(driver_tuple::Tuple,
                        coords)
 
 Creates and returns a NamedTuple with the cache variables required by the
-atmospheric and radiative drivers.
+model drivers.
 
-If no forcing is required, `a` and `r` are type `Nothing` and an
+If no forcing is required,  driver_tuple is an empty tuple, and an
 empty NamedTuple is returned.
 """
-function initialize_drivers(
-    a::Union{AbstractAtmosphericDrivers, Nothing},
-    r::Union{AbstractRadiativeDrivers, Nothing},
-    coords,
-)
-    atmos_drivers = initialize_drivers(a, coords)
-    radiation_drivers = initialize_drivers(r, coords)
-    merge(atmos_drivers, radiation_drivers)
+function initialize_drivers(driver_tuple::Tuple,
+                            coords,
+                            )
+    tmp = map(driver_tuple) do (driver)
+        nt = initialize_drivers(driver, coords)
+    end
+    merge(tmp...)
 end
 
 """
-    make_update_drivers(a::Union{AbstractAtmosphericDrivers, Nothing},
-                          r::Union{AbstractRadiativeDrivers, Nothing},
-                         )
+    make_update_drivers(driver_tuple)
 
-Creates and returns a function which updates the atmospheric
-and radiative forcing variables ("drivers").
+Creates and returns a function which updates the forcing variables ("drivers").
 """
 function make_update_drivers(
-    a::Union{AbstractAtmosphericDrivers, Nothing},
-    r::Union{AbstractRadiativeDrivers, Nothing},
+    driver_tuple::Tuple
 )
-    update_atmos! = make_update_drivers(a)
-    update_radiation! = make_update_drivers(r)
+    update_driver_list = map(driver_tuple) do (driver)
+        make_update_drivers(driver)
+    end
     function update_drivers!(p, t)
-        update_atmos!(p, t)
-        update_radiation!(p, t)
+        for ud! in update_driver_list
+            ud!(p, t)
+        end
     end
     return update_drivers!
 end
 
 """
-    make_update_drivers(d::Union{AbstractAtmosphericDrivers, AbstractRadiativeDrivers, Nothing})
+    make_update_drivers(d::Union{AbstractClimaLandDrivers, Nothing})
 
 Creates and returns a function which updates the driver variables
 in the case of no driver variables. This is also the default.
 """
 make_update_drivers(
-    d::Union{AbstractAtmosphericDrivers, AbstractRadiativeDrivers, Nothing},
+    d::Union{AbstractClimaLandDrivers, Nothing},
 ) = (p, t) -> nothing
 
 """

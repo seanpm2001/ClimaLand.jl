@@ -23,33 +23,27 @@ import ClimaLand:
     AbstractBC,
     boundary_flux,
     AbstractSource,
-    source!
+    source!,
+    make_update_drivers,
+    initialize_drivers
 export SoilCO2ModelParameters,
     SoilCO2Model,
-    PrescribedMet,
-    PrescribedSOC,
+    PrescribedSoil,
     MicrobeProduction,
     SoilCO2FluxBC,
     AtmosCO2StateBC,
     SoilCO2StateBC,
-    AbstractSoilDriver,
-    SoilDrivers
-
+    AbstractSoilDriver
+include("soil_driver.jl")
 """
     SoilCO2ModelParameters{FT <: AbstractFloat, PSE}
 
 A struct for storing parameters of the `SoilCO2Model`.
 $(DocStringExtensions.FIELDS)
 """
-Base.@kwdef struct SoilCO2ModelParameters{FT <: AbstractFloat, PSE}
-    "Soil porosity (m³ m⁻³)"
-    ν::FT
-    "Air-filled porosity at soil water potential of -100 cm H₂O (~ 10 Pa)"
-    θ_a100::FT
+Base.@kwdef struct SoilCO2ModelParameters{FT <: AbstractFloat,, PSE}
     "Diffusion coefficient for CO₂ in air at standard temperature and pressure (m² s⁻¹)"
     D_ref::FT
-    "Absolute value of the slope of the line relating log(ψ) versus log(θ) (unitless)"
-    b::FT
     "Diffusivity of soil C substrate in liquid (unitless)"
     D_liq::FT
     # DAMM
@@ -86,7 +80,7 @@ A model for simulating the production and transport of CO₂ in the soil with dy
 source and diffusion terms.
 $(DocStringExtensions.FIELDS)
 """
-struct SoilCO2Model{FT, PS, D, BC, S, DT} <:
+struct SoilCO2Model{FT, PS, D, BC, S} <:
        AbstractSoilBiogeochemistryModel{FT}
     "the parameter set"
     parameters::PS
@@ -97,7 +91,7 @@ struct SoilCO2Model{FT, PS, D, BC, S, DT} <:
     "A tuple of sources, each of type AbstractSource"
     sources::S
     "Drivers"
-    driver::DT
+    driver::NamedTuple
 end
 
 
@@ -107,8 +101,8 @@ SoilCO2Model{FT}(;
         domain::ClimaLand.AbstractDomain,
         boundary_conditions::NamedTuple,
         sources::Tuple,
-        drivers::DT,
-    ) where {FT, BC, DT}
+        drivers::NamedTuple,
+    ) where {FT, BC}
 
 A constructor for `SoilCO2Model`.
 """
@@ -117,8 +111,8 @@ function SoilCO2Model{FT}(;
     domain::ClimaLand.AbstractDomain,
     boundary_conditions::BC,
     sources::Tuple,
-    drivers::DT,
-) where {FT, BC, DT}
+    drivers::NamedTuple,
+) where {FT, BC}
     args = (parameters, domain, boundary_conditions, sources, drivers)
     SoilCO2Model{FT, typeof.(args)...}(args...)
 end
@@ -268,131 +262,6 @@ function ClimaLand.source!(
 end
 
 """
-    AbstractSoilDriver
-
-An abstract type for drivers of soil CO2 production and diffusion.
-These are soil temperature, soil moisture,
-root carbon, soil organic matter and microbe carbon, and atmospheric pressure.
-Soil temperature and moisture, as well as soc, vary in space (horizontally and vertically) and time.
-Atmospheric pressure vary in time (defined at the surface only, not with depth).
-"""
-abstract type AbstractSoilDriver end
-
-"""
-    SoilDrivers
-
-A container which passes in the soil drivers to the biogeochemistry
-model. These drivers are either of type Prescribed (for standalone mode)
-or Prognostic (for running with a prognostic model for soil temp and moisture).
-
-$(DocStringExtensions.FIELDS)
-"""
-struct SoilDrivers{
-    FT,
-    MET <: AbstractSoilDriver,
-    SOC <: AbstractSoilDriver,
-    ATM <: PrescribedAtmosphere{FT},
-}
-    "Soil temperature and moisture drivers - Prescribed or Prognostic"
-    met::MET
-    "Soil SOM driver - Prescribed only"
-    soc::SOC
-    "Prescribed atmospheric variables"
-    atmos::ATM
-end
-
-"""
-    PrescribedMet <: AbstractSoilDriver
-
-A container which holds the prescribed functions for soil temperature
-and moisture.
-
-This is meant for use when running the biogeochemistry model in standalone mode,
-without a prognostic soil model.
-
-$(DocStringExtensions.FIELDS)
-"""
-struct PrescribedMet{FT, F1 <: Function, F2 <: Function} <: AbstractSoilDriver
-    "The temperature of the soil, of the form f(z::FT,t) where FT <: AbstractFloat"
-    temperature::F1
-    "Soil moisture, of the form f(z::FT,t) FT <: AbstractFloat"
-    volumetric_liquid_fraction::F2
-end
-
-function PrescribedMet{FT}(
-    temperature::Function,
-    volumetric_liquid_fraction::Function,
-) where {FT <: AbstractFloat}
-    return PrescribedMet{
-        FT,
-        typeof(temperature),
-        typeof(volumetric_liquid_fraction),
-    }(
-        temperature,
-        volumetric_liquid_fraction,
-    )
-end
-
-
-"""
-    PrescribedSOC <: AbstractSoilDriver
-
-A container which holds the prescribed function for soil organic carbon
-
-This is meant for use when running the biogeochemistry model without a soil
-organic carbon model.
-
-$(DocStringExtensions.FIELDS)
-"""
-struct PrescribedSOC{FT, F <: Function} <: AbstractSoilDriver
-    "Carbon content of soil organic matter, of the form f(z::FT, t) where FT <: AbstractFloat"
-    soil_organic_carbon::F
-end
-
-function PrescribedSOC{FT}(Csom) where {FT <: AbstractFloat}
-    return PrescribedSOC{FT, typeof(Csom)}(Csom)
-end
-
-"""
-    soil_temperature(driver::PrescribedMet, p, Y, t, z)
-
-Returns the soil temperature at location (z) and time (t) for the prescribed
-soil case.
-"""
-function soil_temperature(driver::PrescribedMet, p, Y, t, z)
-    return driver.temperature.(z, t)
-end
-
-"""
-    soil_moisture(driver::PrescribedMet, p, Y, t, z)
-
-Returns the soil moisture at location (z) and time (t) for the prescribed
-soil case.
-"""
-function soil_moisture(driver::PrescribedMet, p, Y, t, z)
-    return driver.volumetric_liquid_fraction.(z, t)
-end
-
-"""
-    soil_som_C(driver::PrescribedSOC, p, Y, t, z)
-
-Returns the carbon soil organic matter (SOM) at location (z) and time (t) for the prescribed
-soil case.
-"""
-function soil_SOM_C(driver::PrescribedSOC, p, Y, t, z)
-    return driver.soil_organic_carbon.(z, t)
-end
-
-"""
-    air_pressure(driver::PrescribedAtmosphere, t)
-
-Returns the prescribed air pressure at the top boundary condition at time (t).
-"""
-function air_pressure(driver::PrescribedAtmosphere, p, Y, t) # not sure if/why p and Y are needed?
-    return p.drivers.P
-end
-
-"""
     make_update_aux(model::SoilCO2Model)
 
 An extension of the function `make_update_aux`, for the soilco2 equation.
@@ -402,18 +271,14 @@ This has been written so as to work with Differential Equations.jl.
 """
 function ClimaLand.make_update_aux(model::SoilCO2Model)
     function update_aux!(p, Y, t)
-        # get FT to enforce types of variables not stored directly in `p`
-        FT = eltype(Y.soilco2.C)
         params = model.parameters
         z = model.domain.fields.z
-        T_soil = FT.(soil_temperature(model.driver.met, p, Y, t, z))
-        θ_l = FT.(soil_moisture(model.driver.met, p, Y, t, z))
-        Csom = FT.(soil_SOM_C(model.driver.soc, p, Y, t, z))
-        P_sfc = FT.(air_pressure(model.driver.atmos, p, Y, t))
-        θ_w = θ_l
-
-        p.soilco2.D .= co2_diffusivity.(T_soil, θ_w, P_sfc, Ref(params))
-        p.soilco2.Sm .= microbe_source.(T_soil, θ_l, Csom, Ref(params))
+        T_soil = soil_temperature(model.driver.met, p, Y)
+        θ_l = soil_moisture(model.driver.met, p, Y)
+        Csom = soil_SOM_C(model.driver.soc, p, Y)
+        P_sfc = p.drivers.P
+        @. p.soilco2.D = co2_diffusivity(T_soil, θ_l, P_sfc, driver.θa_100, driver.b, driver.ν, Ref(params))
+        @. p.soilco2.Sm = microbe_source(T_soil, θ_l, Csom, driver.ν, Ref(params))
     end
     return update_aux!
 end
@@ -583,7 +448,7 @@ function ClimaLand.boundary_flux(
 end
 
 function ClimaLand.get_drivers(model::SoilCO2Model)
-    return (model.driver.atmos, nothing)
+    return (model.driver.atmos, model.driver.soil)
 end
 
 include("./co2_parameterizations.jl")
