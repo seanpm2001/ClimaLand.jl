@@ -28,12 +28,11 @@ import ClimaLand:
     initialize_drivers
 export SoilCO2ModelParameters,
     SoilCO2Model,
-    PrescribedSoil,
+    PrescribedBiogeochemistrySoil,
     MicrobeProduction,
     SoilCO2FluxBC,
     AtmosCO2StateBC,
-    SoilCO2StateBC,
-    AbstractSoilDriver
+    SoilCO2StateBC
 include("soil_driver.jl")
 """
     SoilCO2ModelParameters{FT <: AbstractFloat, PSE}
@@ -41,7 +40,7 @@ include("soil_driver.jl")
 A struct for storing parameters of the `SoilCO2Model`.
 $(DocStringExtensions.FIELDS)
 """
-Base.@kwdef struct SoilCO2ModelParameters{FT <: AbstractFloat,, PSE}
+Base.@kwdef struct SoilCO2ModelParameters{FT <: AbstractFloat, PSE}
     "Diffusion coefficient for CO₂ in air at standard temperature and pressure (m² s⁻¹)"
     D_ref::FT
     "Diffusivity of soil C substrate in liquid (unitless)"

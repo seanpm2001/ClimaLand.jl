@@ -1,25 +1,21 @@
 using StaticArrays
-export AbstractSoilDriver, PrescribedSoil, ground_albedo_NIR, ground_albedo_PAR
+export PrescribedCanopySoil, ground_albedo_NIR, ground_albedo_PAR
+
 
 """
-An abstract type of soil drivers of the canopy model.
-"""
-abstract type AbstractSoilDriver end
-
-"""
-     PrescribedSoil <: AbstractSoilDriver
+     PrescribedCanopySoil <: AbstractSoilDriver
 
 A container for holding prescribed soil parameters needed by the canopy model
 when running the canopy in standalone mode, including the soil pressure, surface
 temperature, and albedo.
 $(DocStringExtensions.FIELDS)
 """
-struct PrescribedSoil{
+struct PrescribedCanopySoil{
     FT,
     F1 <: Function,
     F2 <: Function,
     VEC <: AbstractArray{FT},
-} <: AbstractSoilDriver
+} <: ClimaLand.AbstractSoilDriver{FT}
     "The depth of the root tips, in meters"
     root_depths::VEC
     "Prescribed soil potential (m) in the root zone  a function of time"
@@ -35,7 +31,7 @@ struct PrescribedSoil{
 end
 
 """
-     function PrescribedSoil(FT;
+     function PrescribedCanopySoil(FT;
          root_depths::AbstractArray{FT},
          ψ::Function,
          T::Function,
@@ -44,10 +40,10 @@ end
          ϵ::FT
      ) where {FT}
 
-An outer constructor for the PrescribedSoil soil driver allowing the user to
+An outer constructor for the PrescribedCanopySoil soil driver allowing the user to
 specify the soil parameters by keyword arguments.
 """
-function PrescribedSoil(
+function PrescribedCanopySoil(
     FT;
     root_depths::AbstractArray = (SVector{10, FT}(
         -(10:-1:1.0) ./ 10.0 * 2.0 .+ 0.2 / 2.0,
@@ -58,7 +54,7 @@ function PrescribedSoil(
     α_NIR = FT(0.4),
     ϵ = FT(0.99),
 )
-    return PrescribedSoil{FT, typeof(ψ), typeof(T), typeof(root_depths)}(
+    return PrescribedCanopySoil{FT, typeof(ψ), typeof(T), typeof(root_depths)}(
         root_depths,
         ψ,
         T,
@@ -70,11 +66,11 @@ end
 
 
 """
-    ground_albedo_PAR(soil_driver::PrescribedSoil, _...)
+    ground_albedo_PAR(soil_driver::PrescribedCanopySoil, _...)
 
 Returns the soil albedo in the PAR for a PrescribedSoil driver.
 """
-function ground_albedo_PAR(soil_driver::PrescribedSoil, _...)
+function ground_albedo_PAR(soil_driver::PrescribedCanopySoil, _...)
     return soil_driver.α_PAR
 end
 
@@ -83,6 +79,6 @@ end
 
 Returns the soil albedo in the NIR for a PrescribedSoil driver.
 """
-function ground_albedo_NIR(soil_driver::PrescribedSoil, _...)
+function ground_albedo_NIR(soil_driver::PrescribedCanopySoil, _...)
     return soil_driver.α_NIR
 end

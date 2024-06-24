@@ -420,29 +420,6 @@ function soil_boundary_fluxes!(
 end
 
 
-"""
-     PrognosticSoil{FT} <: AbstractSoilDriver
-
-Concrete type of AbstractSoilDriver used for dispatch in cases where both
-a canopy model and soil model are run.
-$(DocStringExtensions.FIELDS)
-"""
-struct PrognosticSoil{F <: Union{AbstractFloat, ClimaCore.Fields.Field}} <:
-       AbstractSoilDriver
-    "Soil albedo for PAR"
-    α_PAR::F
-    "Soil albedo for NIR"
-    α_NIR::F
-end
-
-function Canopy.ground_albedo_PAR(soil_driver::PrognosticSoil, Y, p, t)
-    return soil_driver.α_PAR
-end
-
-function Canopy.ground_albedo_NIR(soil_driver::PrognosticSoil, Y, p, t)
-    return soil_driver.α_NIR
-end
-
 
 """
     PlantHydraulics.root_water_flux_per_ground_area!(

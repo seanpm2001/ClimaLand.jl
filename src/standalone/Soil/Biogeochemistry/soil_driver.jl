@@ -1,15 +1,7 @@
+using ClimaUtilities.TimeVaryingInputs: AbstractTimeVaryingInput, evaluate!
 
 """
-    AbstractSoilDriver{FT}
-
-An abstract type for time varying and/or spatially varying 
-soil properties (temperature, water content, organic carbon, etc)
-which are either prescribed or prognostic.
-"""
-abstract type AbstractSoilDriver{F} <: AbstractClimaLandDrivers {FT} end
-
-"""
-    PrescribedSoil <: AbstractSoilDriver
+    PrescribedBiogeochemistrySoil <: AbstractSoilDriver
 
 A container which holds the prescribed functions for soil temperature, moisture,
 and carbon.
@@ -19,7 +11,7 @@ without a prognostic soil model.
 
 $(DocStringExtensions.FIELDS)
 """
-struct PrescribedSoil{FT, F1 <: AbstractTimeVaryingInput, F2 <: AbstractTimeVaryingInput, F3 <: AbstractTimeVaryingInput, F <:Union{AbstractFloat, ClimaCore.Fields.Field}} <: AbstractSoilDriver
+struct PrescribedBiogeochemistrySoil{FT, F1 <: AbstractTimeVaryingInput, F2 <: AbstractTimeVaryingInput, F3 <: AbstractTimeVaryingInput, F <:Union{AbstractFloat, ClimaCore.Fields.Field}} <: ClimaLand.AbstractSoilDriver{FT}
     "The temperature of the soil, of the form f(z::FT,t) where FT <: AbstractFloat"
     temperature::F1
     "Soil moisture, of the form f(z::FT,t) FT <: AbstractFloat"
@@ -34,7 +26,7 @@ struct PrescribedSoil{FT, F1 <: AbstractTimeVaryingInput, F2 <: AbstractTimeVary
     b::F
 end
 
-function ClimaLand.initialize_drivers(s::PrescribedSoil{FT}, coords) where {FT}
+function ClimaLand.initialize_drivers(s::PrescribedBiogeochemistrySoil{FT}, coords) where {FT}
     keys = (:T,:θ_l, :soc, :ν, :θa_100, :b)
     types = (FT,)
     domain_names = (:subsurface,)
@@ -47,55 +39,55 @@ function ClimaLand.initialize_drivers(s::PrescribedSoil{FT}, coords) where {FT}
     return vars.drivers
 end
 
-function PrescribedSoil{FT}(
+function PrescribedBiogeochemistrySoil{FT}(
     T_soil,
     θ_l_soil,
     soil_organic_carbon,
     ν::F,
     θa_100::F,
     b::F
-) where {FT <: AbstractFloat}
-    parametric_types = {FT, typeof(T_soil), typeof(θ_l_soil), typeof(soil_organic_carbon), typeof(ν)}
-    return PrescribedSoil{parametric_types...}(T_soil, θ_l_soil, soil_organic_carbon, ν, θa_100, b)
+) where {F, FT <: AbstractFloat}
+    parametric_types = (FT, typeof(T_soil), typeof(θ_l_soil), typeof(soil_organic_carbon), typeof(ν))
+    return PrescribedBiogeochemistrySoil{parametric_types...}(T_soil, θ_l_soil, soil_organic_carbon, ν, θa_100, b)
 end
 
 """
-    soil_temperature(driver::PrescribedSoil, p, Y, t, z)
+    soil_temperature(driver::PrescribedBiogeochemistrySoil, p, Y, t, z)
 
 Returns the soil temperature for the prescribed
 soil case.
 """
-function soil_temperature(driver::PrescribedSoil, p, Y, t, z)
+function soil_temperature(driver::PrescribedBiogeochemistrySoil, p, Y, t, z)
     return p.drivers.T_soil
 end
 
 """
-    soil_moisture(driver::PrescribedSoil, p, Y)
+    soil_moisture(driver::PrescribedBiogeochemistrySoil, p, Y)
 
 Returns the soil moisture for the prescribed
 soil case.
 """
-function soil_moisture(driver::PrescribedSoil, p, Y)
+function soil_moisture(driver::PrescribedBiogeochemistrySoil, p, Y)
     return p.drivers.θ_l_soil
 end
 
 """
-    soil_som_C(driver::PrescribedSoil, p, Y)
+    soil_som_C(driver::PrescribedBiogeochemistrySoil, p, Y)
 
 Returns the carbon soil organic matter (SOM) for the prescribed
 soil case.
 """
-function soil_SOM_C(driver::PrescribedSoil, p, Y)
+function soil_SOM_C(driver::PrescribedBiogeochemistrySoil, p, Y)
     return p.drivers.soil_organic_carbon
 end
 
 """
-    make_update_drivers(a::PrescribedSoil{FT}) where {FT}
+    make_update_drivers(a::PrescribedBiogeochemistrySoil{FT}) where {FT}
 
 Creates and returns a function which updates the driver variables
 in the case of a PrescribedSoil.
 """
-function make_update_drivers(d::PrescribedSoil{FT}) where {FT}
+function make_update_drivers(d::PrescribedBiogeochemistrySoil{FT}) where {FT}
     function update_drivers!(p, t)
         evaluate!(p.drivers.T_soil, d.T_soil, t)
         evaluate!(p.drivers.θ_l_soil, d.θ_l_soil, t)
