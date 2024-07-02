@@ -1,4 +1,4 @@
-export LandSoilBiogeochemistry, PrognosticMet
+export LandSoilBiogeochemistry, PrognosticSoilforBiogeochemistry
 
 """
     struct LandSoilBiogeochemistry{
@@ -47,17 +47,17 @@ function LandSoilBiogeochemistry{FT}(;
     )
 
     soilco2 = Soil.Biogeochemistry.SoilCO2Model{FT}(; soilco2_args...)
-    if !(soilco2_args.drivers.met isa PrognosticMet)
+    if !(soilco2_args.drivers.soil isa PrognosticSoilforBiogeochemistry)
         throw(
             AssertionError(
-                "To run with a prognostic soil energy and hydrology model, the met driver must be of type PrognosticMet.",
+                "To run with a prognostic soil energy and hydrology model, the soil driver must be of type PrognosticSoilforBiogeochemistry.",
             ),
         )
     end
-    if soil_args.parameters.ν != soilco2_args.parameters.ν
+    if soil_args.parameters.ν != soilco2_args.drivers.ν
         throw(
             AssertionError(
-                "The provided porosity must be the same in both model parameter structures.",
+                "The provided porosity must be the same in both models.",
             ),
         )
     end
@@ -66,26 +66,48 @@ function LandSoilBiogeochemistry{FT}(;
     return LandSoilBiogeochemistry{FT, typeof.(args)...}(args...)
 end
 
-struct PrognosticMet{FT} <: Soil.Biogeochemistry.AbstractSoilDriver end
+struct PrognosticSoilforBiogeochemistry{
+    FT,
+    F1 <: Function,
+    F <: Union{AbstractFloat, ClimaCore.Fields.Field},
+} <: Soil.Biogeochemistry.AbstractSoilDriver
+    "Carbon content of soil organic matter, of the form f(z::FT, t) where FT <: AbstractFloat"
+    soil_organic_carbon::F3
+    "Soil porosity (m³ m⁻³)"
+    ν::F
+    "Air-filled porosity at soil water potential of -100 cm H₂O (~ 10 Pa)"
+    θ_a100::F
+    "Absolute value of the slope of the line relating log(ψ) versus log(θ) (unitless)"
+    b::F
+end
 
 """
-    soil_temperature(driver::PrognosticSoil, p, Y, t, z)
+    soil_temperature(driver::PrognosticSoil, p, _...)
 Returns the prognostic soil temperature.
 """
-function soil_temperature(driver::PrognosticMet, p, Y, t, z)
+function soil_temperature(driver::PrognosticSoilforBiogeochemistry, p, _...)
     return p.soil.T
 end
 
 """
-    soil_moisture(driver::PrognosticSoil, p, Y, t, z)
+    soil_moisture(driver::PrognosticSoil, p, _...)
 
 Returns the volumetric liquid fraction, computed by the soil
 model from the prognostic liquid and ice fractions.
 """
-function soil_moisture(driver::PrognosticMet, p, Y, t, z)
+function soil_moisture(driver::PrognosticSoilforBiogeochemistry, p, _...)
     return p.soil.θ_l
 end
 
+"""
+    soil_som_C(driver::PrognosticSoilforBiogeochemistry, p, Y, t, z)
+
+Returns the carbon soil organic matter (SOM) at location (z) and time (t) for the prognostic soil
+case, which still has a prescribed soil carbon.
+"""
+function soil_SOM_C(driver::PrognosticSoilforBiogeochemistry, p, Y, t, z)
+    return driver.soil_organic_carbon.(z, t)
+end
 
 function ClimaLand.get_drivers(model::LandSoilBiogeochemistry)
     bc = model.soil.boundary_conditions.top

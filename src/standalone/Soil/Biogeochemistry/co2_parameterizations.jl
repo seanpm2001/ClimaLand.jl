@@ -16,9 +16,10 @@ function microbe_source(
     T_soil::FT,
     θ_l::FT,
     Csom::FT,
+    ν::FT,
     params::SoilCO2ModelParameters{FT},
 ) where {FT}
-    (; α_sx, Ea_sx, kM_sx, kM_o2, ν, D_liq, p_sx, D_oa, O2_a, earth_param_set) =
+    (; α_sx, Ea_sx, kM_sx, kM_o2, D_liq, p_sx, D_oa, O2_a, earth_param_set) =
         params
     R = FT(LP.gas_constant(earth_param_set))
     Vmax = α_sx * exp(-Ea_sx / (R * T_soil)) # Maximum potential rate of respiration
@@ -69,9 +70,12 @@ function co2_diffusivity(
     T_soil::FT,
     θ_w::FT,
     P_sfc::FT,
+    θ_a100::FT,
+    b::FT,
+    ν::FT,
     params::SoilCO2ModelParameters{FT},
 ) where {FT}
-    (; D_ref, θ_a100, b, ν, earth_param_set) = params
+    (; D_ref, earth_param_set) = params
     T_ref = FT(LP.T_0(earth_param_set))
     P_ref = FT(LP.P_ref(earth_param_set))
     θ_a = volumetric_air_content(θ_w, params)
