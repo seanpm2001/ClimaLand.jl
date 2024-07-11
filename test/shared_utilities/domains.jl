@@ -42,7 +42,7 @@ FT = Float32
     face_space = obtain_face_space(shell.space.subsurface)
     z_face = ClimaCore.Fields.coordinate_field(face_space).z
     @test shell.fields.z_sfc == top_face_to_surface(z_face, shell.space.surface)
-    Δz_top, Δz_bottom = get_Δz(shell.fields.z)
+    Δz_top, Δz_bottom, Δz = get_Δz(shell.fields.z)
     @test shell.fields.Δz_top == Δz_top
     @test shell.fields.Δz_bottom == Δz_bottom
     @test shell.radius == radius
@@ -107,7 +107,7 @@ FT = Float32
     face_space = obtain_face_space(box.space.subsurface)
     z_face = ClimaCore.Fields.coordinate_field(face_space).z
     @test box.fields.z_sfc == top_face_to_surface(z_face, box.space.surface)
-    Δz_top, Δz_bottom = get_Δz(box.fields.z)
+    Δz_top, Δz_bottom, Δz = get_Δz(box.fields.z)
     @test box.fields.Δz_top == Δz_top
     @test box.fields.Δz_bottom == Δz_bottom
     box_coords = coordinates(box).subsurface
@@ -172,15 +172,16 @@ FT = Float32
     # Column
 
     z_column = Column(; zlim = zlim, nelements = nelements[3])
-    @test z_column.fields.z ==
-          ClimaCore.Fields.coordinate_field(z_column.space.subsurface).z
+    z = ClimaCore.Fields.coordinate_field(z_column.space.subsurface).z
+    @test z_column.fields.z == z
     face_space = obtain_face_space(z_column.space.subsurface)
     z_face = ClimaCore.Fields.coordinate_field(face_space).z
     @test z_column.fields.z_sfc ==
           top_face_to_surface(z_face, z_column.space.surface)
-    Δz_top, Δz_bottom = get_Δz(z_column.fields.z)
+    Δz_top, Δz_bottom, Δz = get_Δz(z_column.fields.z)
     @test z_column.fields.Δz_top == Δz_top
     @test z_column.fields.Δz_bottom == Δz_bottom
+    @test Δz == ClimaCore.Fields.Δz_field(z)
     column_coords = coordinates(z_column).subsurface
     @test z_column.zlim == FT.(zlim)
     @test z_column.nelements[1] == nelements[3]
