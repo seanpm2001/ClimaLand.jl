@@ -90,7 +90,7 @@ function SoilCanopyModel{FT}(;
 
     (; atmos, radiation) = land_args
     # These should always be set by the constructor.
-    sources = (RootExtraction{FT}(), Soil.PhaseChange{FT}())
+    sources = (RootExtraction{FT}(), Soil.PhaseChange{FT}(FT(10)))
     if :runoff ∈ propertynames(land_args)
         top_bc = ClimaLand.Soil.AtmosDrivenFluxBC(
             atmos,

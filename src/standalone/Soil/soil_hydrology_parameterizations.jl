@@ -100,17 +100,18 @@ function pressure_head(
 end
 
 """
-   dψdϑ(cm::vanGenuchten{FT}, ϑ, ν, θ_r, S_s)
+   dψdϑ(cm::vanGenuchten{FT}, ϑ_l, ν_eff, θ_r, S_s)
 
 Computes and returns the derivative of the pressure head 
 with respect to ϑ for the van Genuchten formulation.
 """
-function dψdϑ(cm::vanGenuchten{FT}, ϑ, ν, θ_r, S_s) where {FT}
-    S = effective_saturation(ν, ϑ, θ_r)
+function dψdϑ(cm::vanGenuchten{FT}, ϑ_l, ν_eff, θ_r, S_s) where {FT}
+    ϑ_l_safe = max(ϑ_l, θ_r + eps(FT))
+    S = effective_saturation(ν_eff, ϑ_l_safe, θ_r)
     (; α, m, n) = cm
     if S < 1.0
         return FT(
-            1.0 / (α * m * n) / (ν - θ_r) *
+            1.0 / (α * m * n) / (ν_eff - θ_r) *
             (S^(-1 / m) - 1)^(1 / n - 1) *
             S^(-1 / m - 1),
         )

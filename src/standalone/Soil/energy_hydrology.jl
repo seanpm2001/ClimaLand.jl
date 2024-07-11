@@ -331,7 +331,7 @@ function ClimaLand.make_compute_jacobian(model::EnergyHydrology{FT}) where {FT}
                             ClimaLand.Soil.dψdϑ(
                                 hydrology_cm,
                                 Y.soil.ϑ_l,
-                                ν,
+                                ν - Y.soil.θ_i, #ν_eff
                                 θ_r,
                                 S_s,
                             ),
@@ -353,7 +353,7 @@ function ClimaLand.make_compute_jacobian(model::EnergyHydrology{FT}) where {FT}
                         ClimaLand.Soil.dψdϑ(
                             hydrology_cm,
                             Y.soil.ϑ_l,
-                            ν,
+                            ν - Y.soil.θ_i,
                             θ_r,
                             S_s,
                         ),
@@ -574,7 +574,9 @@ end
 
 PhaseChange source type.
 """
-struct PhaseChange{FT} <: AbstractSoilSource{FT} end
+struct PhaseChange{FT} <: AbstractSoilSource{FT}
+    thermal_time_coeff::FT
+end
 
 
 """
@@ -597,6 +599,7 @@ function ClimaLand.source!(
 ) where {FT}
     params = model.parameters
     (; ν, ρc_ds, θ_r, hydrology_cm, earth_param_set) = params
+    thermal_time_coeff = src.thermal_time_coeff
     _ρ_l = FT(LP.ρ_cloud_liq(earth_param_set))
     _ρ_i = FT(LP.ρ_cloud_ice(earth_param_set))
     Δz = model.domain.fields.Δz # center face distance
@@ -614,6 +617,7 @@ function ClimaLand.source!(
                 ),
                 Δz,
                 p.soil.κ,
+                thermal_time_coeff
             ),
             ν,
             θ_r,
@@ -634,6 +638,7 @@ function ClimaLand.source!(
                 ),
                 Δz,
                 p.soil.κ,
+                thermal_time_coeff
             ),
             ν,
             θ_r,
