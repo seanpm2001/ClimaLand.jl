@@ -204,11 +204,11 @@ prob = SciMLBase.ODEProblem(
     p,
 );
 
-sol = SciMLBase.solve(prob, ode_algo; dt = dt, callback = cb, saveat = saveat);
+@time sol = SciMLBase.solve(prob, ode_algo; dt = dt, callback = cb, saveat = saveat);
 
 savedir = joinpath(pkgdir(ClimaLand), "experiments/standalone/Vegetation");
 T = [parent(sol.u[k].canopy.energy.T)[1] for k in 1:length(sol.t)]
-@show T
+@show isnan(T[end])
 T_atmos = [parent(sv.saveval[k].drivers.T)[1] for k in 1:length(sol.t)]
 ϑ_l = [parent(sol.u[k].canopy.hydraulics.ϑ_l.:2)[1] for k in 1:length(sol.t)]
 ϑ_s = [parent(sol.u[k].canopy.hydraulics.ϑ_l.:1)[1] for k in 1:length(sol.t)]
