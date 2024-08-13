@@ -106,10 +106,38 @@ Returns the snow depth given SWE, snow density ρ_snow, and
 the density of liquid water ρ_l.
 
 """
-function snow_depth(SWE::FT, ρ_snow::FT, ρ_l::FT)::FT where {FT}
-    return SWE * ρ_l / ρ_snow
+function dzdt(density::ConstantDensityModel, model::SnowModel{FT}, Y, p, t)::FT where {FT}
+    ρ_l = FT(LP.ρ_cloud_liq(model.parameters.earth_param_set))
+    return p.snow.applied_water_flux .* ρ_l ./ density.ρ_snow
 end
 
+function eval_nn(model::Chain, z::FT, swe::FT, P::FT, T::FT, R::FT, qrel::FT, u::FT)::FT where {FT}
+    input = FT.([z, swe, qrel, R, u, T, P])
+    return model(input)[1]
+end
+
+function dzdt(density::NeuralDepthModel, model::SnowModel{FT}, Y, p, t)::FT where {FT}
+    #get inputs (do we need to make these the averages?)
+    z = Y.snow.Z
+    swe = Y.snow.S
+    dprecipdt_snow = p.drivers.P_snow
+    air_temp_avg = p.drivers.T .- 273.15 #convert to C, is there a more-CliMA way?
+    sol_rad_avg = p.drivers.SW_d
+    rel_hum_avg = relative_humidity.(Ref(model.atmos.thermo_params), p.drivers.thermal_state)
+    wind_speed_avg = p.drivers.u
+    #eval neural network (do we only want to test it once per day?)
+    dzdt = eval_nn.(Ref(density.z_model), z, swe, dprecipdt_snow, air_temp_avg, sol_rad_avg, rel_hum_avg, wind_speed_avg)
+    return dzdt
+end
+
+function snow_density(density::ConstantDensityModel, SWE::FT, z::FT, parameters::SnowParameters{FT})::FT where {FT}
+    return density.ρ_snow
+end
+
+function snow_density(density::NeuralDepthModel, SWE::FT, z::FT, parameters::SnowParameters{FT})::FT where {FT}
+    ρ_l = ρ_l = FT(LP.ρ_cloud_liq(parameters.earth_param_set))
+    return SWE / Z * ρ_l
+end
 
 
 """
@@ -281,12 +309,9 @@ liquid water (runoff) from the snowpack.
 
 Runoff occurs as the snow melts and exceeds the water holding capacity.
 """
-function compute_water_runoff(S::FT, q_l::FT, T::FT, parameters) where {FT}
-    _ρ_l = FT(LP.ρ_cloud_liq(parameters.earth_param_set))
-    ρ_snow::FT = parameters.ρ_snow
+function compute_water_runoff(S::FT, q_l::FT, T::FT, ρ_snow::FT, depth::FT, parameters) where {FT}
     Ksat::FT = parameters.Ksat
     Δt::FT = parameters.Δt
-    depth = snow_depth(S, ρ_snow, _ρ_l)
     τ = runoff_timescale(depth, Ksat, Δt)
     q_l_max::FT = maximum_liquid_mass_fraction(T, ρ_snow, parameters)
     return -(q_l - q_l_max) * heaviside(q_l - q_l_max) / τ * S /

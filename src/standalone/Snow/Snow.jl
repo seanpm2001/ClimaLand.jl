@@ -41,6 +41,29 @@ and is used as a bulk snow model.
 """
 abstract type AbstractSnowModel{FT} <: ClimaLand.AbstractExpModel{FT} end
 
+abstract type AbstractDensityModel{FT <: AbstractFloat} end
+
+struct ConstantDensityModel{FT} <: AbstractDensityModel{FT}
+    ρ_snow::FT
+end
+
+function ConstantDensityModel{FT}(ρ::FT) where {FT} #why is FT in brackets?
+    return ConstantDensityModel{FT}(ρ)
+end
+
+#does this not require adding the neural extension whenever any snow is invoked? Is this okay?
+# or inclusion of Flux, Dates
+struct NeuralDepthModel{FT} <: AbstractDensityModel{FT}
+    z_model::Flux.Chain
+    Δt_updt::Period #make constant? Or leave adaptable for different algos
+end
+#For the constructor: Flux.f32() or Flux.f64() sets weight values to right type, how to incorporate given FT?
+#How to prevent editing of Δt_updt without changing z_model, and vice versa? aka force any change of one to force a change in the other?
+
+function NeuralDepthModel{FT}(model::Chain, Δt::Period) where {FT}
+    return NeuralDepthModel{FT}(model, Δt, FT(0))
+end
+
 
 """
     SnowParameters{FT <: AbstractFloat, PSE}
@@ -55,9 +78,9 @@ a parameter, and take the larger of the timestep and the physical timescale
 as the value used in the model. Future implementations will revisit this.
 $(DocStringExtensions.FIELDS)
 """
-Base.@kwdef struct SnowParameters{FT <: AbstractFloat, PSE}
-    "Density of snow (kg/m^3)"
-    ρ_snow::FT
+Base.@kwdef struct SnowParameters{FT <: AbstractFloat, DM <: AbstractDensityModel, PSE}
+    "Choice of parameterization for snow density"
+    density::DM
     "Roughness length over snow for momentum (m)"
     z_0m::FT
     "Roughness length over snow for scalars (m)"
@@ -82,7 +105,7 @@ end
 
 """
    SnowParameters{FT}(Δt;
-                      ρ_snow = FT(200),
+                      density = ConstantDensityModel(FT(200)),
                       z_0m = FT(0.0024),
                       z_0b = FT(0.00024),
                       α_snow = FT(0.8),
@@ -98,7 +121,7 @@ all arguments but `earth_param_set`.
 """
 function SnowParameters{FT}(
     Δt;
-    ρ_snow = FT(200),
+    density = ConstantDensityModel(FT(200)),
     z_0m = FT(0.0024),
     z_0b = FT(0.00024),
     α_snow = FT(0.8),
@@ -108,9 +131,9 @@ function SnowParameters{FT}(
     κ_ice = FT(2.21),
     ρcD_g = FT(3.553e5),
     earth_param_set::PSE,
-) where {FT <: AbstractFloat, PSE}
-    return SnowParameters{FT, PSE}(
-        ρ_snow,
+) where {FT <: AbstractFloat, DM <: AbstractDensityModel, PSE}
+    return SnowParameters{FT, DM, PSE}(
+        density,
         z_0m,
         z_0b,
         α_snow,
@@ -140,7 +163,7 @@ of Tarboton et al. (1995) and Tarboton and Luce (1996).
 """
 struct SnowModel{
     FT,
-    PS <: SnowParameters{FT},
+    PS <: SnowParameters{FT}, #why are the PSE/DM not here?
     ATM <: AbstractAtmosphericDrivers{FT},
     RAD <: AbstractRadiativeDrivers{FT},
     D,
@@ -156,11 +179,11 @@ struct SnowModel{
 end
 
 function SnowModel(;
-    parameters::SnowParameters{FT, PSE},
+    parameters::SnowParameters{FT, DM, PSE},
     domain::ClimaLand.Domains.AbstractDomain,
     atmos::ATM,
     radiation::RAD,
-) where {FT, PSE, ATM, RAD}
+) where {FT, DM, PSE, ATM, RAD}
     args = (parameters, atmos, radiation, domain)
     SnowModel{FT, typeof.(args)...}(args...)
 end
@@ -171,9 +194,9 @@ end
 Returns the prognostic variable names of the snow model.
 
 For this model, we track the snow water equivalent S [m] and
-the energy per unit area U [J/m^2] prognostically.
+the energy per unit area U [J/m^2] prognostically, as well as snow depth [m].
 """
-prognostic_vars(::SnowModel) = (:S, :U)
+prognostic_vars(::SnowModel) = (:S, :U, :Z)
 
 """
     prognostic_types(::SnowModel{FT})
@@ -182,7 +205,7 @@ Returns the prognostic variable types of the snow model;
 both snow water equivalent and energy per unit area
 are scalars.
 """
-prognostic_types(::SnowModel{FT}) where {FT} = (FT, FT)
+prognostic_types(::SnowModel{FT}) where {FT} = (FT, FT, FT)
 
 """
     prognostic_domain_names(::SnowModel)
@@ -192,13 +215,14 @@ both snow water equivalent and energy per unit area
 are modeling only as a function of (x,y), and not as a function
 of depth. Therefore their domain name is ":surface".
 """
-prognostic_domain_names(::SnowModel) = (:surface, :surface)
+prognostic_domain_names(::SnowModel) = (:surface, :surface, :surface)
 
 """
     auxiliary_vars(::SnowModel)
 
 Returns the auxiliary variable names for the snow model. These
-include the mass fraction in liquid water (`q_l`, unitless),
+include the bulk snow density (`ρ_snow`, kg/m^3),
+mass fraction in liquid water (`q_l`, unitless),
 the bulk temperature (`T`, K), the surface temperature (`T_sfc`, K),
 the SHF, LHF, and vapor flux (`turbulent_fluxes.shf`, etc),
 the net radiation (`R_n, J/m^2/s)`, the energy flux in liquid water runoff
@@ -210,6 +234,7 @@ clipped values are what are actually applied as boundary fluxes, and are stored 
 `applied_` fluxes.
 """
 auxiliary_vars(::SnowModel) = (
+    :ρ_snow,
     :q_l,
     :T,
     :T_sfc,
@@ -228,6 +253,7 @@ auxiliary_types(::SnowModel{FT}) where {FT} = (
     FT,
     FT,
     FT,
+    FT,
     NamedTuple{(:lhf, :shf, :vapor_flux, :r_ae), Tuple{FT, FT, FT, FT}},
     FT,
     FT,
@@ -240,6 +266,7 @@ auxiliary_types(::SnowModel{FT}) where {FT} = (
 )
 
 auxiliary_domain_names(::SnowModel) = (
+    :surface,
     :surface,
     :surface,
     :surface,
@@ -274,6 +301,8 @@ function ClimaLand.make_update_aux(model::SnowModel{FT}) where {FT}
     function update_aux!(p, Y, t)
         parameters = model.parameters
 
+        @. p.snow.ρ_snow = snow_density(parameters.density, Y.snow.S, Y.snow.z, parameters) #pass density model explicitly for multiple dispatch
+
         @. p.snow.q_l =
             snow_liquid_mass_fraction(Y.snow.U, Y.snow.S, parameters)
 
@@ -283,7 +312,7 @@ function ClimaLand.make_update_aux(model::SnowModel{FT}) where {FT}
         @. p.snow.T_sfc = snow_surface_temperature(p.snow.T)
 
         @. p.snow.water_runoff =
-            compute_water_runoff(Y.snow.S, p.snow.q_l, p.snow.T, parameters)
+            compute_water_runoff(Y.snow.S, p.snow.q_l, p.snow.T, p.snow.ρ_snow, Y.snow.Z, parameters)
 
         @. p.snow.energy_runoff =
             p.snow.water_runoff * volumetric_internal_energy_liq(FT, parameters)
@@ -336,6 +365,13 @@ function ClimaLand.make_compute_exp_tendency(model::SnowModel{FT}) where {FT}
     function compute_exp_tendency!(dY, Y, p, t)
         @. dY.snow.S = p.snow.applied_water_flux
         @. dY.snow.U = p.snow.applied_energy_flux
+        dY.snow.Z .= clip_dZdt.(
+            Y.snow.S,
+            Y.snow.Z,
+            p.snow.applied_water_flux,
+            dzdt(model.parameters.density, model, Y, p, t),
+            model.parameters.Δt
+        )
     end
     return compute_exp_tendency!
 end
@@ -368,6 +404,23 @@ function clip_dUdt(U, S, dUdt, dSdt, Δt)
         return -U / Δt
     else
         return dUdt
+    end
+end
+
+"""
+    clip_dZdt(U, S, dUdt, dSdt, Δt)
+
+A helper function which clips the tendency of Z such that
+its behavior is consistent with that of S.
+"""
+function clip_dZdt(S, Z, dSdt, dZdt, Δt)
+    if (S + dSdt * Δt) < 0
+        return -Z / Δt
+    elseif (Z + dZdt * Δt) < (S + dSdt * Δt)
+        #do we need to do something about setting q_l = 1 here?
+        return (S-Z) / Δt + dSdt
+    else
+        return dZdt
     end
 end
 
