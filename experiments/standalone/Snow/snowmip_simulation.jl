@@ -21,11 +21,12 @@ using DelimitedFiles
 
 # Site-specific quantities
 # Error if no site argument is provided
-if length(ARGS) < 1
-    @error("Please provide a site name as command line argument")
-else
-    SITE_NAME = ARGS[1]
-end
+#if length(ARGS) < 1
+#    @error("Please provide a site name as command line argument")
+#else
+#    SITE_NAME = ARGS[1]
+#end
+SITE_NAME = "cdp"
 
 climaland_dir = pkgdir(ClimaLand)
 
@@ -83,6 +84,8 @@ drivers = ClimaLand.get_drivers(model)
 updatefunc = ClimaLand.make_update_drivers(drivers)
 driver_cb = ClimaLand.DriverUpdateCallback(updateat, updatefunc)
 cb = SciMLBase.CallbackSet(driver_cb, saving_cb)
+
+error("stop here!")
 
 sol = SciMLBase.solve(
     prob,

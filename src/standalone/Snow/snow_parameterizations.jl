@@ -111,7 +111,7 @@ function dzdt(density::ConstantDensityModel, model::SnowModel{FT}, Y, p, t)::FT 
     return p.snow.applied_water_flux .* ρ_l ./ density.ρ_snow
 end
 
-function eval_nn(model::Chain, z::FT, swe::FT, P::FT, T::FT, R::FT, qrel::FT, u::FT)::FT where {FT}
+function eval_nn(model, z::FT, swe::FT, P::FT, T::FT, R::FT, qrel::FT, u::FT)::FT where {FT}
     input = FT.([z, swe, qrel, R, u, T, P])
     return model(input)[1]
 end

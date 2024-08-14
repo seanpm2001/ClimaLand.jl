@@ -1,6 +1,7 @@
 module Snow
 
 using DocStringExtensions
+using Dates
 import ...Parameters as LP
 using ClimaCore
 using Thermodynamics
@@ -54,13 +55,13 @@ end
 #does this not require adding the neural extension whenever any snow is invoked? Is this okay?
 # or inclusion of Flux, Dates
 struct NeuralDepthModel{FT} <: AbstractDensityModel{FT}
-    z_model::Flux.Chain
+    z_model#::Flux.Chain
     Δt_updt::Period #make constant? Or leave adaptable for different algos
 end
 #For the constructor: Flux.f32() or Flux.f64() sets weight values to right type, how to incorporate given FT?
 #How to prevent editing of Δt_updt without changing z_model, and vice versa? aka force any change of one to force a change in the other?
 
-function NeuralDepthModel{FT}(model::Chain, Δt::Period) where {FT}
+function NeuralDepthModel{FT}(model, Δt::Period) where {FT}
     return NeuralDepthModel{FT}(model, Δt, FT(0))
 end
 
