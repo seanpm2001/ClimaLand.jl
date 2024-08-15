@@ -62,6 +62,11 @@ end
 #How to prevent editing of Δt_updt without changing z_model, and vice versa? aka force any change of one to force a change in the other?
 
 function NeuralDepthModel{FT}(model, Δt::Period) where {FT}
+    if FT == Float32
+        #call f32()
+    elseif FT == Float64
+        #call f64()
+    end
     return NeuralDepthModel{FT}(model, Δt, FT(0))
 end
 
