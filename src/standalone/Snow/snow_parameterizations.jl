@@ -106,9 +106,9 @@ Returns the snow depth given SWE, snow density ρ_snow, and
 the density of liquid water ρ_l.
 
 """
-function dzdt(density::ConstantDensityModel, model::SnowModel{FT}, Y, p, t)::FT where {FT}
+function dzdt(density::ConstantDensityModel, model::SnowModel{FT}, Y, p, t) where {FT}
     ρ_l = FT(LP.ρ_cloud_liq(model.parameters.earth_param_set))
-    return p.snow.applied_water_flux .* ρ_l ./ density.ρ_snow
+    return p.snow.applied_water_flux .* FT(ρ_l ./ density.ρ_snow)
 end
 
 function eval_nn(model, z::FT, swe::FT, P::FT, T::FT, R::FT, qrel::FT, u::FT)::FT where {FT}
@@ -116,7 +116,7 @@ function eval_nn(model, z::FT, swe::FT, P::FT, T::FT, R::FT, qrel::FT, u::FT)::F
     return model(input)[1]
 end
 
-function dzdt(density::NeuralDepthModel, model::SnowModel{FT}, Y, p, t)::FT where {FT}
+function dzdt(density::NeuralDepthModel, model::SnowModel{FT}, Y, p, t) where {FT}
     #get inputs (do we need to make these the averages?)
     z = Y.snow.Z
     swe = Y.snow.S

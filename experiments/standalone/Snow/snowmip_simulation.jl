@@ -46,8 +46,11 @@ ndays = (tf - t0) / 3600 / 24
 
 domain = Point(; z_sfc = FT(0))
 
+dens = Snow.ConstantDensityModel(ρ)
+depths = z[snow_data_avail]
+
 parameters =
-    SnowParameters{FT}(Δt; α_snow = α, ρ_snow = ρ, earth_param_set = param_set)
+    SnowParameters{FT}(Δt; α_snow = α, density = dens, earth_param_set = param_set)
 model = ClimaLand.Snow.SnowModel(
     parameters = parameters,
     domain = domain,
@@ -58,6 +61,7 @@ Y, p, coords = ClimaLand.initialize(model)
 
 # Set initial conditions
 Y.snow.S .= FT(SWE[1]) # first data point
+Y.snow.Z .= FT(depths[1])
 Y.snow.U .=
     ClimaLand.Snow.energy_from_q_l_and_swe(FT(SWE[1]), FT(0), parameters) # with q_l = 0
 
@@ -84,8 +88,6 @@ drivers = ClimaLand.get_drivers(model)
 updatefunc = ClimaLand.make_update_drivers(drivers)
 driver_cb = ClimaLand.DriverUpdateCallback(updateat, updatefunc)
 cb = SciMLBase.CallbackSet(driver_cb, saving_cb)
-
-error("stop here!")
 
 sol = SciMLBase.solve(
     prob,
@@ -176,7 +178,7 @@ plot!(
 scatter!(plot1c, mean_obs_df.doy, mean_obs_df.obs_swe, label = "Data")
 
 plot(plot1a, plot1b, plot1c, layout = (3, 1), size = (800, 800))
-savefig(joinpath(savedir, "snow_water_content_$(SITE_NAME).png"))
+#savefig(joinpath(savedir, "snow_water_content_$(SITE_NAME).png"))
 
 plot2a = plot(xlim = (0, ndays), ylim = (250, 280))
 plot!(
@@ -225,7 +227,7 @@ scatter!(plot2c, mean_obs_df.doy, mean_obs_df.obs_tsnow, label = "Data")
 
 snow_energy_plot =
     plot(plot2a, plot2b, plot2c, layout = (3, 1), size = (800, 800))
-savefig(joinpath(savedir, "snow_energy_content_$(SITE_NAME).png"))
+#savefig(joinpath(savedir, "snow_energy_content_$(SITE_NAME).png"))
 
 plot3 = plot(
     xlabel = "Time (days)",
@@ -254,4 +256,4 @@ plot!(
     label = "Runoff",
     color = "blue",
 )
-savefig(joinpath(savedir, "water_fluxes_$(SITE_NAME).png"))
+#savefig(joinpath(savedir, "water_fluxes_$(SITE_NAME).png"))

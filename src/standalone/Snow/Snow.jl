@@ -62,12 +62,12 @@ end
 #How to prevent editing of Δt_updt without changing z_model, and vice versa? aka force any change of one to force a change in the other?
 
 function NeuralDepthModel{FT}(model, Δt::Period) where {FT}
-    if FT == Float32
-        #call f32()
-    elseif FT == Float64
-        #call f64()
-    end
-    return NeuralDepthModel{FT}(model, Δt, FT(0))
+    #if FT == Float32
+    #    call f32()
+    #elseif FT == Float64
+    #    #call f64()
+    #end
+    return NeuralDepthModel{FT}(model, Δt)
 end
 
 
@@ -127,7 +127,7 @@ all arguments but `earth_param_set`.
 """
 function SnowParameters{FT}(
     Δt;
-    density = ConstantDensityModel(FT(200)),
+    density::DM = ConstantDensityModel(FT(200)),
     z_0m = FT(0.0024),
     z_0b = FT(0.00024),
     α_snow = FT(0.8),
@@ -307,7 +307,7 @@ function ClimaLand.make_update_aux(model::SnowModel{FT}) where {FT}
     function update_aux!(p, Y, t)
         parameters = model.parameters
 
-        @. p.snow.ρ_snow = snow_density(parameters.density, Y.snow.S, Y.snow.z, parameters) #pass density model explicitly for multiple dispatch
+        p.snow.ρ_snow .= snow_density.(Ref(parameters.density), Y.snow.S, Y.snow.Z, parameters) #pass density model explicitly for multiple dispatch
 
         @. p.snow.q_l =
             snow_liquid_mass_fraction(Y.snow.U, Y.snow.S, parameters)
