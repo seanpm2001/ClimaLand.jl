@@ -48,7 +48,7 @@ struct ConstantDensityModel{FT} <: AbstractDensityModel{FT}
     ρ_snow::FT
 end
 
-function ConstantDensityModel{FT}(ρ::FT) where {FT} #why is FT in brackets?
+function ConstantDensityModel{FT}(ρ::FT) where {FT}
     return ConstantDensityModel{FT}(ρ)
 end
 
@@ -58,10 +58,11 @@ struct NeuralDepthModel{FT} <: AbstractDensityModel{FT}
     z_model#::Flux.Chain
     Δt_updt::Period #make constant? Or leave adaptable for different algos
 end
-#For the constructor: Flux.f32() or Flux.f64() sets weight values to right type, how to incorporate given FT?
-#How to prevent editing of Δt_updt without changing z_model, and vice versa? aka force any change of one to force a change in the other?
 
-function NeuralDepthModel{FT}(model, Δt::Period) where {FT}
+
+function NeuralDepthModel(model, Δt::Period, FT)
+    #need to include Flux if we want to set default of FT to be eltype(Flux.params(model)[1]),
+    # and also set weights accordingly for pased FT
     #if FT == Float32
     #    call f32()
     #elseif FT == Float64
@@ -169,7 +170,7 @@ of Tarboton et al. (1995) and Tarboton and Luce (1996).
 """
 struct SnowModel{
     FT,
-    PS <: SnowParameters{FT}, #why are the PSE/DM not here?
+    PS <: SnowParameters{FT},
     ATM <: AbstractAtmosphericDrivers{FT},
     RAD <: AbstractRadiativeDrivers{FT},
     D,

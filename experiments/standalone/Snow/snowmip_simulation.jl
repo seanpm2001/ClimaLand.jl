@@ -19,6 +19,10 @@ using Statistics
 using Insolation
 using DelimitedFiles
 
+using CSV, HTTP, Flux, cuDNN
+ModelTools = Base.get_extension(ClimaLand, :NeuralSnowExt).ModelTools;
+using BSON
+
 # Site-specific quantities
 # Error if no site argument is provided
 #if length(ARGS) < 1
@@ -46,11 +50,22 @@ ndays = (tf - t0) / 3600 / 24
 
 domain = Point(; z_sfc = FT(0))
 
-dens = Snow.ConstantDensityModel(ρ)
+dens_const = Snow.ConstantDensityModel(ρ)
 depths = z[snow_data_avail]
 
+modelz_download_link = "https://caltech.box.com/shared/static/ay7cv0rhuiytrqbongpeq2y7m3cimhm4.bson"
+z_idx = 1
+p_idx = 7
+nfeatures = 7
+zmodel = ModelTools.make_model(nfeatures, 4, z_idx, p_idx)
+zmodel_state =
+    BSON.load(IOBuffer(HTTP.get(modelz_download_link).body))[:zstate]
+Flux.loadmodel!(zmodel, zmodel_state)
+ModelTools.settimescale!(zmodel, 86400.0)
+dens_neural = Snow.NeuralDepthModel(zmodel, Day(1), Float32)  
+
 parameters =
-    SnowParameters{FT}(Δt; α_snow = α, density = dens, earth_param_set = param_set)
+    SnowParameters{FT}(Δt; α_snow = α, density = dens_neural, earth_param_set = param_set)
 model = ClimaLand.Snow.SnowModel(
     parameters = parameters,
     domain = domain,
@@ -114,6 +129,7 @@ snow = [parent(sv.saveval[k].drivers.P_snow)[1] for k in 1:length(sv.t)];
 
 S = [parent(sol.u[k].snow.S)[1] for k in 1:length(sol.t)];
 U = [parent(sol.u[k].snow.U)[1] for k in 1:length(sol.t)];
+Z = [parent(sol.u[k].snow.Z)[1] for k in 1:length(sol.t)];
 t = sol.t;
 
 start_day = 1
@@ -126,12 +142,17 @@ obs_swes[snow_data_avail] .= mass[snow_data_avail] ./ 1000
 obs_tsnows = Vector{Union{Float64, Missing}}(missing, length(doys))
 obs_tsnows[snow_data_avail] = T_snow .+ 273.15
 
+obs_zs = Vector{Union{Float64, Missing}}(missing, length(doys))
+obs_zs[snow_data_avail] .= depths
+
 obs_df = DataFrame(
     doy = doys,
     model_swe = S,
     obs_swe = obs_swes,
     model_tsnow = T,
     obs_tsnow = obs_tsnows,
+    model_z = Z,
+    obs_z = obs_zs
 )
 function missingmean(x)
     return mean(skipmissing(x))
@@ -139,9 +160,19 @@ end
 
 mean_obs_df = combine(
     groupby(obs_df, :doy),
-    [:model_swe, :obs_swe, :model_tsnow, :obs_tsnow] .=> missingmean,
+    [:model_swe, :obs_swe, :model_tsnow, :obs_tsnow, :model_z, :obs_z] .=> missingmean,
     renamecols = false,
 )
+
+zplot = plot()
+plot!(
+    zplot,
+    timestamp[1] .+ Second.(seconds),
+    Z,
+    label = "Model, Depth",
+    ylabel = "Depth (m)"
+)
+scatter!(zplot, timestamp[1] .+ Second.(seconds), obs_zs, label = "Data")
 
 plot1a = plot()
 plot!(

@@ -120,10 +120,10 @@ function dzdt(density::NeuralDepthModel, model::SnowModel{FT}, Y, p, t) where {F
     #get inputs (do we need to make these the averages?)
     z = Y.snow.Z
     swe = Y.snow.S
-    dprecipdt_snow = p.drivers.P_snow
-    air_temp_avg = p.drivers.T .- 273.15 #convert to C, is there a more-CliMA way?
+    dprecipdt_snow = abs.(p.drivers.P_snow) #need to change downward direction to scalar
+    air_temp_avg = p.drivers.T .- model.parameters.earth_param_set.T_freeze
     sol_rad_avg = p.drivers.SW_d
-    rel_hum_avg = relative_humidity.(Ref(model.atmos.thermo_params), p.drivers.thermal_state)
+    rel_hum_avg = Thermodynamics.relative_humidity.(Ref(model.atmos.thermo_params), p.drivers.thermal_state)
     wind_speed_avg = p.drivers.u
     #eval neural network (do we only want to test it once per day?)
     dzdt = eval_nn.(Ref(density.z_model), z, swe, dprecipdt_snow, air_temp_avg, sol_rad_avg, rel_hum_avg, wind_speed_avg)
@@ -136,7 +136,7 @@ end
 
 function snow_density(density::NeuralDepthModel, SWE::FT, z::FT, parameters::SnowParameters{FT})::FT where {FT}
     ρ_l = ρ_l = FT(LP.ρ_cloud_liq(parameters.earth_param_set))
-    return SWE / Z * ρ_l
+    return SWE / z * ρ_l
 end
 
 
