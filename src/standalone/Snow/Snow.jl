@@ -42,35 +42,77 @@ and is used as a bulk snow model.
 """
 abstract type AbstractSnowModel{FT} <: ClimaLand.AbstractExpModel{FT} end
 
+"""
+    AbstractDensityModel{FT}
+
+Defines the model type for density and depth parameterizations
+for use within an `AbstractSnowModel` type. Current examples include the
+`ConstantDensityModel` and the `Anderson1976` models.
+"""
 abstract type AbstractDensityModel{FT <: AbstractFloat} end
 
+"""
+    ConstantDensityModel{FT <: AbstractFloat} <: AbstractDensityModel{FT}
+
+Establishes the density parameterization where snow density
+is always treated as a constant (type FT).
+"""
 struct ConstantDensityModel{FT} <: AbstractDensityModel{FT}
     ρ_snow::FT
 end
 
+"""
+    ConstantDensityModel{FT}(ρ::FT)
+
+An outer constructor for the `ConstantDensityModel` density parameterization for usage in a snow model.
+"""
 function ConstantDensityModel{FT}(ρ::FT) where {FT}
     return ConstantDensityModel{FT}(ρ)
 end
 
-#does this not require adding the neural extension whenever any snow is invoked? Is this okay?
-# or inclusion of Flux, Dates
-struct NeuralDepthModel{FT} <: AbstractDensityModel{FT}
-    z_model#::Flux.Chain
-    Δt_updt::Period #make constant? Or leave adaptable for different algos
+
+"""
+    ConstantDensityModel{FT <: AbstractFloat} <: AbstractDensityModel{FT}
+
+Establishes the density parameterization where snow density
+compacts according to the seminal works of Anderson in the 1970s (and specifically the
+numerical implementation documented in the Snow17 model).
+"""
+struct Anderson1976{FT} <: AbstractDensityModel{FT}
+    c1::FT
+    c2::FT
+    c3::FT
+    c4::FT
+    c5::FT
+    cx::FT
+    ρ_d::FT
 end
 
+"""
+    Anderson1976(FT; c1, c2, c3, c4, c5, ρ_d, cx)
 
-function NeuralDepthModel(model, Δt::Period, FT)
-    #need to include Flux if we want to set default of FT to be eltype(Flux.params(model)[1]),
-    # and also set weights accordingly for pased FT
-    #if FT == Float32
-    #    call f32()
-    #elseif FT == Float64
-    #    #call f64()
-    #end
-    return NeuralDepthModel{FT}(model, Δt)
+An outer constructor for the `Anderson1976` density parameterization for usage in a snow model.
+Uses the default constants defined by Anderson but allows for redefinition of the model constants.
+These include:
+- c1: fractional increase in density (0.026 cm/hr)
+- c2: compression constant estimated by Kojima in 1967 (21 cm^3/g)
+- c3: fractional settling rate at 0 degrees C for densities less than the critical density ρ_d (0.005 1/hr)
+- c4: constant (0.1 1/degrees C)
+- c5: scaling of the settling rate when no water is present in the snowpack (0, it is 2 when water is present)
+- cx: destructive metamorphism decay factor for densities greater than the critical density ρ_d (23)
+- ρ_d: the critical density (unitless as a fraction of the density of liquid water, 0.15)
+"""
+function Anderson1976(FT::DataType;
+    c1 = 0.026,
+    c2 = 21.0,
+    c3 = 0.005,
+    c4 = 0.10,
+    c5 = 0.0, #Snow17 code says 1.0, paper says 0.0?
+    ρ_d = 0.15,
+    cx = 23.0,
+)
+return Anderson1976{FT}(FT(c1), FT(c2), FT(c3), FT(c4), FT(c5), FT(ρ_d), FT(cx))
 end
-
 
 """
     SnowParameters{FT <: AbstractFloat, PSE}
