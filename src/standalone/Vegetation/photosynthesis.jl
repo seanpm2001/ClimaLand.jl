@@ -99,22 +99,25 @@ function photosynthesis_at_a_point_Farquhar(
     medlyn_factor,
     R,
     Vcmax25,
-    Γstar25,
-    ΔHJmax,
-    ΔHVcmax,
-    ΔHΓstar,
-    f,
-    ΔHRd,
-    To,
-    θj,
-    ϕ,
-    mechanism,
-    oi,
-    Kc25,
-    Ko25,
-    ΔHkc,
-    ΔHko,
+    parameters,
 )
+    (;
+        Γstar25,
+        ΔHJmax,
+        ΔHVcmax,
+        ΔHΓstar,
+        f,
+        ΔHRd,
+        To,
+        θj,
+        ϕ,
+        mechanism,
+        oi,
+        Kc25,
+        Ko25,
+        ΔHkc,
+        ΔHko,
+    ) = parameters
     Jmax = max_electron_transport(Vcmax25, ΔHJmax, T, To, R)
     J = electron_transport(APAR, Jmax, θj, ϕ)
     Vcmax = compute_Vcmax(Vcmax25, T, To, R, ΔHVcmax)
@@ -158,27 +161,7 @@ function update_photosynthesis!(
     c_co2,
     R,
 )
-    (;
-        Vcmax25,
-        f,
-        ΔHRd,
-        To,
-        Γstar25,
-        ΔHJmax,
-        ΔHVcmax,
-        ΔHΓstar,
-        f,
-        ΔHRd,
-        To,
-        θj,
-        ϕ,
-        mechanism,
-        oi,
-        Kc25,
-        Ko25,
-        ΔHkc,
-        ΔHko,
-    ) = model.parameters
+    (; Vcmax25, f, ΔHRd, To) = model.parameters
     @. Rd = dark_respiration(Vcmax25, β, f, ΔHRd, T, To, R)
     @. An = photosynthesis_at_a_point_Farquhar(
         T,
@@ -189,21 +172,7 @@ function update_photosynthesis!(
         medlyn_factor,
         R,
         Vcmax25,
-        Γstar25,
-        ΔHJmax,
-        ΔHVcmax,
-        ΔHΓstar,
-        f,
-        ΔHRd,
-        To,
-        θj,
-        ϕ,
-        mechanism,
-        oi,
-        Kc25,
-        Ko25,
-        ΔHkc,
-        ΔHko,
+        model.parameters,
     )
     Vcmax25field .= Vcmax25
 end
