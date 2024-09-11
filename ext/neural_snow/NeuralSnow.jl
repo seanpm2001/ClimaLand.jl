@@ -2,26 +2,28 @@ module NeuralSnow
 
 using Flux, Dates
 using ClimaCore
+using ClimaLand
 using ClimaLand.Snow: AbstractDensityModel, SnowModel, SnowParameters
 import ClimaLand.Snow: dzdt, snow_density
 import ClimaLand.Parameters as LP
 using Thermodynamics
 
+using CSV, HTTP, Flux, cuDNN, StatsBase, BSON
+ModelTools = Base.get_extension(ClimaLand, :NeuralSnowExt).ModelTools;
+
 export snow_density, dzdt, NeuralDepthModel
 
 """
-    ConstantDensityModel{FT <: AbstractFloat} <: AbstractDensityModel{FT}
+    NeuralDepthModel{FT <: AbstractFloat} <: AbstractDensityModel{FT}
 
 Establishes the density parameterization where snow density
-is always treated as a constant (type FT).
+is calculated from a neural network determining the rate of change of snow depth, dzdt.
 """
-#does this not require adding the neural extension whenever any snow is invoked? Is this okay?
-# or inclusion of Flux, Dates
-mutable struct NeuralDepthModel{FT} <: AbstractDensityModel{FT}
+struct NeuralDepthModel{FT} <: AbstractDensityModel{FT}
     z_model::Flux.Chain
-    Δt_updt::Period #make constant? Or leave adaptable for different algos, do we even need?
+    Δt::FT #make constant? Or leave adaptable for different algos?
     type::Symbol
-    sol_avg::Vector{ClimaCore.Fields.Field}
+    sol_avg::Vector{ClimaCore.Fields.Field} #if EMA is the best type, then decision on whether to leave this or delete and use dY. var instead
     wind_avg::Vector{ClimaCore.Fields.Field}
     temp_avg::Vector{ClimaCore.Fields.Field}
     hum_avg::Vector{ClimaCore.Fields.Field}
@@ -30,27 +32,47 @@ mutable struct NeuralDepthModel{FT} <: AbstractDensityModel{FT}
 end
 
 """
-    ConstantDensityModel{FT}(ρ::FT)
+    get_znetwork(; download_link = "https://caltech.box.com/shared/static/ay7cv0rhuiytrqbongpeq2y7m3cimhm4.bson")
 
-An outer constructor for the `ConstantDensityModel` density parameterization for usage in a snow model.
+A default function for returning the snow-depth neural network from the paper.
 """
-function NeuralDepthModel(model, Δt::Period, type::Symbol, FT::DataType; α = nothing)
-    #need to include Flux if we want to set default of FT to be eltype(Flux.params(model)[1]),
-    # and also set weights accordingly for pased FT
+#decision on whether to include this function determines dependency of BSON for the neural extension
+function get_znetwork(; download_link = "https://caltech.box.com/shared/static/ay7cv0rhuiytrqbongpeq2y7m3cimhm4.bson")
+    z_idx = 1
+    p_idx = 7
+    nfeatures = 7
+    zmodel = ModelTools.make_model(nfeatures, 4, z_idx, p_idx)
+    zmodel_state = BSON.load(IOBuffer(HTTP.get(download_link).body))[:zstate]
+    Flux.loadmodel!(zmodel, zmodel_state)
+    ModelTools.settimescale!(zmodel, 86400.0)
+    return zmodel
+
+    #give ability to also load from local file too?
+    #BSON.@load "../SnowResearch/cleancode/testhrmodel.bson" zstate
+    #Flux.loadmodel!(zmodel, zstate)
+end
+
+"""
+    NeuralDepthModel{FT}(type::Symbol, Δt::FT; model::Flux.Chain = get_znetwork(), α = nothing)
+
+An outer constructor for the `NeuralDepthModel` density parameterization for usage in a snow model.
+Can choose to use custom models via the `model` argument, or a custom weight with `α` if using `type` `:DEMA` or `:EMA`.
+the `type` argument dictates the formulation of inputs to the network (moving averages or instantaneous values of inputs).
+"""
+function NeuralDepthModel(Δt::FT; type::Symbol = :EMA, model::Flux.Chain = get_znetwork(), α = nothing) where {FT}
     usemodel = model
     if FT == Float32
         usemodel = Flux.f32(model)
     elseif FT == Float64
         usemodel = Flux.f64(model)
     end
-    #also, set num_idx depending on Δt_updt and the timestepping algo and type:
     if !in(type, [:instantaneous, :daily, :EMA, :DEMA])
         error("Requested type of NeuralDepthModel is not implemented. Existing models are ':instantaneous', ':daily', ':EMA', :'DEMA'")
     end
     num_idx = 1
     weight = FT(0)
     if type == :daily
-        #set this based off of Δt_updt, timestepping algo, etc.
+        #set this based off of Δt, timestepping algo, etc.
         num_idx = 24*4
     end
     if type == :DEMA
@@ -60,7 +82,7 @@ function NeuralDepthModel(model, Δt::Period, type::Symbol, FT::DataType; α = n
         weight = FT(1)
     end
     if type in [:EMA, :DEMA]
-        #auto-calculate value of weight for rough daily average or according to Δt_updt and model timestep, etc:
+        #auto-calculate value of weight for rough daily average or according to Δt and model timestep, etc:
         weight = FT(2/97.0)
     end
     if !isnothing(α)
@@ -71,9 +93,7 @@ function NeuralDepthModel(model, Δt::Period, type::Symbol, FT::DataType; α = n
     temp_avg = Vector{ClimaCore.Fields.Field}(undef, num_idx)
     hum_avg = Vector{ClimaCore.Fields.Field}(undef, num_idx)
     precip_avg = Vector{ClimaCore.Fields.Field}(undef, num_idx)
-    #set model output limiter depending on Δt:
-    #settimescale!(model, something_with_Δt_updt)
-    return NeuralDepthModel{FT}(model, Δt, type, sol_avg, wind_avg, temp_avg, hum_avg, precip_avg, weight)
+    return NeuralDepthModel{FT}(usemodel, Δt, type, sol_avg, wind_avg, temp_avg, hum_avg, precip_avg, weight)
 end
 
 """
@@ -140,8 +160,7 @@ function dzdt(density::NeuralDepthModel, model::SnowModel{FT}, Y, p, t) where {F
     rel_hum = Thermodynamics.relative_humidity.(Ref(model.atmos.thermo_params), p.drivers.thermal_state)
     wind_speed = p.drivers.u
 
-    #update avg fields:
-    #execute on type:
+    #update stored input fields, depending on type:
     local idx    
     for (field, val) in [(density.sol_avg, sol_rad),
         (density.hum_avg, rel_hum),
@@ -161,6 +180,10 @@ function dzdt(density::NeuralDepthModel, model::SnowModel{FT}, Y, p, t) where {F
                 push!(field, val)
             end
             idx += length(field)
+        elseif (idx == 2) & (density.type == :DEMA)
+            temp = field[1]
+            field[1] = (density.α .* val) .+ ((FT(1) - density.α) .* field[1])
+            field[2] = (density.α .* (FT(2) .* val .- field[1])) .+ ((FT(1) - density.α) .* temp)
         else
             field[idx] = val
         end
@@ -170,14 +193,10 @@ function dzdt(density::NeuralDepthModel, model::SnowModel{FT}, Y, p, t) where {F
     rel_hum_avg = (density.type == :daily) ? fieldavg(density.hum_avg) : density.hum_avg[idx]
     air_temp_avg = (density.type == :daily) ? fieldavg(density.temp_avg) : density.temp_avg[idx]
     wind_speed_avg = (density.type == :daily) ? fieldavg(density.wind_avg) : density.wind_avg[idx]
-    precip_snow = (density.type == :daily) ? fieldavg(density.precip_avg) : density.precip_avg[idx] #swap out just the direct precip value dprecipdtdt_snow instead of fieldavg() if bad
+    precip_snow = (density.type == :daily) ? dprecipdt_snow : density.precip_avg[idx] #makes better results
 
     #eval neural network
     dzdt = eval_nn.(Ref(density.z_model), z, swe, precip_snow, air_temp_avg, sol_rad_avg, rel_hum_avg, wind_speed_avg)
-    dzdt = (density.type == :daily) ? dzdt .* FT(Seconds(density.Δt_updt) ./ Seconds(model.parameters.Δt)) : dzdt
-    #notice for the above line ^^ you could just use setoutscale!() in the constructor instead if :daily is specified (but test this version for accuracy first)
-    # you should also see what the above multiplication does for the EMA and other models, or how using settimescale!() to appropriately limit the lower bound, changes the results
-    # however, notice multiplying at the end like the above can technically supersede your set lower bound? (setoutscale!() will not though)
     return dzdt
 end
 

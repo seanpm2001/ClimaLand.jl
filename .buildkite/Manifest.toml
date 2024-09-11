@@ -408,11 +408,11 @@ deps = ["Adapt", "ArtifactWrappers", "ClimaComms", "ClimaCore", "ClimaDiagnostic
 path = ".."
 uuid = "08f4d4ce-cf43-44bb-ad95-9d2d5f413532"
 version = "0.14.1"
-weakdeps = ["CSV", "CUDA", "ClimaParams", "Flux", "HTTP", "StatsBase", "cuDNN"]
+weakdeps = ["BSON", "CSV", "CUDA", "ClimaParams", "Flux", "HTTP", "StatsBase", "cuDNN"]
 
     [deps.ClimaLand.extensions]
     CreateParametersExt = "ClimaParams"
-    NeuralSnowExt = ["CSV", "HTTP", "Flux", "StatsBase", "cuDNN"]
+    NeuralSnowExt = ["CSV", "HTTP", "Flux", "StatsBase", "cuDNN", "BSON"]
 
 [[deps.ClimaParams]]
 deps = ["DocStringExtensions", "TOML", "Test"]
