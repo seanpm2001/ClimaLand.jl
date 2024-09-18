@@ -77,18 +77,18 @@ function SoilCanopyModel{FT}(;
     # These should always be set by the constructor.
     sources = (RootExtraction{FT}(), Soil.PhaseChange{FT}())
     if :runoff ∈ propertynames(land_args)
-        top_bc = ClimaLand.IntegratedAtmosDrivenFluxBC(
+        top_bc = ClimaLand.AtmosDrivenFluxBC(
             atmos,
             radiation,
             land_args.runoff,
             (:canopy, :soil, :soilco2),
-)
+        )
     else #no runoff model
-        top_bc = ClimaLand.IntegratedAtmosDrivenFluxBC(
-             atmos,
+        top_bc = ClimaLand.AtmosDrivenFluxBC(
+            atmos,
             radiation,
             ClimaLand.Soil.Runoff.NoRunoff(),
-            (:canopy, :soil,:soilco2),
+            (:canopy, :soil, :soilco2),
         )
     end
     zero_flux = Soil.HeatFluxBC((p, t) -> 0.0)
@@ -387,7 +387,7 @@ end
 ### Extensions of existing functions to account for prognostic soil/canopy
 """
     soil_boundary_fluxes!(
-        bc::IntegratedAtmosDrivenFluxBC{<:PrescribedAtmosphere, <:PrescribedRadiativeFluxes},
+        bc::AtmosDrivenFluxBC{<:PrescribedAtmosphere, <:PrescribedRadiativeFluxes},
         components::Val{(:canopy, :soil,:soilco2,)},
         soil::EnergyHydrology{FT},
         Y,
@@ -401,8 +401,8 @@ energy and water flux at the surface of the soil for use as boundary
 conditions.
 """
 function soil_boundary_fluxes!(
-    bc::IntegratedAtmosDrivenFluxBC{<:PrescribedAtmosphere, <:PrescribedRadiativeFluxes},
-    components::Val{(:canopy, :soil,:soilco2,)},
+    bc::AtmosDrivenFluxBC{<:PrescribedAtmosphere, <:PrescribedRadiativeFluxes},
+    components::Val{(:canopy, :soil, :soilco2)},
     soil::EnergyHydrology{FT},
     Y,
     p,
@@ -579,7 +579,9 @@ function Canopy.canopy_radiant_energy_fluxes!(
 ) where {F, PSE}
     nothing
 end
-
+function ClimaLand.Soil.sublimation_source(::Val{(:canopy, :soil)}, FT)
+    return SoilSublimation{FT}()
+end
 
 function ClimaLand.get_drivers(model::SoilCanopyModel)
     return (

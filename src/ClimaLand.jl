@@ -299,7 +299,7 @@ using .Pond
 import .Pond: surface_runoff
 include("standalone/Soil/Soil.jl")
 using .Soil
-import .Soil: soil_boundary_fluxes!, AbstractEnergyHydrologyBC
+import .Soil: soil_boundary_fluxes!
 import .Soil.Biogeochemistry: soil_temperature, soil_moisture
 include("standalone/Snow/Snow.jl")
 using .Snow
@@ -312,9 +312,6 @@ import .Canopy:
     ground_albedo_NIR,
     canopy_radiant_energy_fluxes!,
     root_energy_flux_per_ground_area!
-include("integrated/soil_adaptors.jl")
-
-
 ### Concrete types of AbstractLandModels
 ### and associated methods
 include("integrated/soil_energy_hydrology_biogeochemistry.jl")

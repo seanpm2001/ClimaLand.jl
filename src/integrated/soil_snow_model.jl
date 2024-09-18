@@ -58,14 +58,14 @@ function LandHydrologyModel{FT}(;
 ) where {FT, SnM <: Snow.SnowModel, SoM <: Soil.EnergyHydrology{FT}}
     (; atmos, radiation) = land_args
     if :runoff ∈ propertynames(land_args)
-        top_bc = ClimaLand.IntegratedAtmosDrivenFluxBC(
+        top_bc = ClimaLand.AtmosDrivenFluxBC(
             atmos,
             radiation,
             land_args.runoff,
             (:snow, :soil),
         )
     else #no runoff model
-        top_bc = IntegratedAtmosDrivenFluxBC(
+        top_bc = AtmosDrivenFluxBC(
             atmos,
             radiation,
             ClimaLand.Soil.Runoff.NoRunoff(),
@@ -183,7 +183,7 @@ end
 ### Extensions of existing functions to account for prognostic soil/snow
 """
     soil_boundary_fluxes!(
-        bc::IntegratedAtmosDrivenFluxBC{<:PrescribedAtmosphere, <:PrescribedRadiativeFluxes},
+        bc::AtmosDrivenFluxBC{<:PrescribedAtmosphere, <:PrescribedRadiativeFluxes},
         components::Val{(:snow, :soil)},
         soil::EnergyHydrology{FT},
         Y,
@@ -197,7 +197,7 @@ energy and water flux at the surface of the soil for use as boundary
 conditions.
 """
 function soil_boundary_fluxes!(
-    bc::IntegratedAtmosDrivenFluxBC{<:PrescribedAtmosphere, <:PrescribedRadiativeFluxes},
+    bc::AtmosDrivenFluxBC{<:PrescribedAtmosphere, <:PrescribedRadiativeFluxes},
     components::Val{(:snow, :soil)},
     soil::EnergyHydrology{FT},
     Y,
@@ -227,6 +227,47 @@ function soil_boundary_fluxes!(
             p.soil.turbulent_fluxes.lhf +
             p.soil.turbulent_fluxes.shf
         ) + p.excess_heat_flux
+end
+
+function ClimaLand.Soil.sublimation_source(::Val{(:snow, :soil)}, FT)
+    return SoilSublimationwithSnow{FT}()
+end
+
+"""
+    SoilSublimationwithSnow{FT} <: AbstractSoilSource{FT}
+
+Soil Sublimation source type. Used to defined a method
+of `ClimaLand.source!` for soil sublimation with snow present.
+"""
+struct SoilSublimationwithSnow{FT} <: ClimaLand.Soil.AbstractSoilSource{FT} end
+
+"""
+     source!(dY::ClimaCore.Fields.FieldVector,
+             src::SoilSublimationwithSnow{FT},
+             Y::ClimaCore.Fields.FieldVector,
+             p::NamedTuple,
+             model
+             )
+
+Updates dY.soil.θ_i in place with a term due to sublimation; this only affects
+the surface layer of soil.
+
+"""
+function ClimaLand.source!(
+    dY::ClimaCore.Fields.FieldVector,
+    src::SoilSublimationwithSnow{FT},
+    Y::ClimaCore.Fields.FieldVector,
+    p::NamedTuple,
+    model,
+) where {FT}
+    _ρ_i = FT(LP.ρ_cloud_ice(model.parameters.earth_param_set))
+    _ρ_l = FT(LP.ρ_cloud_liq(model.parameters.earth_param_set))
+    z = model.domain.fields.z
+    Δz_top = model.domain.fields.Δz_top # this returns the center-face distance, not layer thickness
+    @. dY.soil.θ_i +=
+        -p.soil.turbulent_fluxes.vapor_flux_ice *
+        (1 - p.snow.snow_cover_fraction) *
+        _ρ_l / _ρ_i * heaviside(z + 2 * Δz_top) # only apply to top layer, recall that z is negative
 end
 
 function ClimaLand.get_drivers(model::LandHydrologyModel)
