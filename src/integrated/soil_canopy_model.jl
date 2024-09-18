@@ -579,8 +579,8 @@ function Canopy.canopy_radiant_energy_fluxes!(
 ) where {F, PSE}
     nothing
 end
-function ClimaLand.Soil.sublimation_source(::Val{(:canopy, :soil)}, FT)
-    return SoilSublimation{FT}()
+function ClimaLand.Soil.sublimation_source(::Val{(:canopy, :soil, :soilco2)}, FT)
+    return ClimaLand.Soil.SoilSublimation{FT}()
 end
 
 function ClimaLand.get_drivers(model::SoilCanopyModel)

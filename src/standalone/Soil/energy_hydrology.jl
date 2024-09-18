@@ -134,7 +134,7 @@ function EnergyHydrology{FT}(;
     if typeof(top_bc) <: AtmosDrivenFluxBC
         # If the top BC indicates atmospheric conditions are driving the model
         # add baseflow as a sink term, add sublimation as a sink term
-        subl_source = sublimation_source(top_bc.components, FT)
+        subl_source = sublimation_source(Val(top_bc.components), FT)
         subsurface_source = subsurface_runoff_source(top_bc.runoff)
         sources = append_source(subsurface_source, sources)
         sources = append_source(subl_source, sources)
