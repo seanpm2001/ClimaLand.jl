@@ -553,13 +553,11 @@ function WaterHeatBC(; water, heat)
 end
 
 abstract type AbstractAtmosDrivenFluxBC <: AbstractEnergyHydrologyBC end
-
-
 """
     AtmosDrivenFluxBC{
         A <: AbstractAtmosphericDrivers,
         B <: AbstractRadiativeDrivers,
-        R <: AbstractRunoffModel
+        R <: AbstractRunoffModel,
     } <: AbstractAtmosDrivenFluxBC
 
 A concrete type of soil boundary condition for use at the top

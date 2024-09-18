@@ -1,41 +1,5 @@
 export LandHydrologyModel
 
-"""
-    AtmosDrivenFluxBCwithSnow{
-        A <: AbstractAtmosphericDrivers,
-        B <: AbstractRadiativeDrivers,
-        R <: ClimaLand.Soil.Runoff.AbstractRunoffModel,
-    } <: ClimaLand.Soil.AbstractAtmosDrivenFluxBC
-
-A type of Soil.AbstractAtmosDrivenFluxBC for use when snow
-changes the boundary conditions of the soil, by modifying
-the fraction of the surface exposed to the atmosphere
-and by providing snowmelt as additional surface infiltration.
-"""
-struct AtmosDrivenFluxBCwithSnow{
-    A <: AbstractAtmosphericDrivers,
-    B <: AbstractRadiativeDrivers,
-    R <: ClimaLand.Soil.Runoff.AbstractRunoffModel,
-} <: ClimaLand.Soil.AbstractAtmosDrivenFluxBC
-    "The atmospheric conditions driving the model"
-    atmos::A
-    "The radiative fluxes driving the model"
-    radiation::B
-    "The runoff model. The default is no runoff."
-    runoff::R
-end
-
-function AtmosDrivenFluxBCwithSnow(atmos, radiation)
-    return AtmosDrivenFluxBCwithSnow{
-        typeof(atmos),
-        typeof(radiation),
-        ClimaLand.Soil.Runoff.NoRunoff,
-    }(
-        atmos,
-        radiation,
-        ClimaLand.Soil.Runoff.NoRunoff(),
-    )
-end
 
 """
     struct LandHydrologyModel{
@@ -94,13 +58,19 @@ function LandHydrologyModel{FT}(;
 ) where {FT, SnM <: Snow.SnowModel, SoM <: Soil.EnergyHydrology{FT}}
     (; atmos, radiation) = land_args
     if :runoff ∈ propertynames(land_args)
-        top_bc = ClimaLand.AtmosDrivenFluxBCwithSnow(
+        top_bc = ClimaLand.IntegratedAtmosDrivenFluxBC(
             atmos,
             radiation,
             land_args.runoff,
+            (:snow, :soil),
         )
     else #no runoff model
-        top_bc = ClimaLand.AtmosDrivenFluxBCwithSnow(atmos, radiation)
+        top_bc = IntegratedAtmosDrivenFluxBC(
+            atmos,
+            radiation,
+            ClimaLand.Soil.Runoff.NoRunoff(),
+            (:snow, :soil),
+        )
     end
     sources = (Soil.PhaseChange{FT}(),)
     zero_flux = Soil.HeatFluxBC((p, t) -> 0.0)
@@ -121,50 +91,6 @@ function LandHydrologyModel{FT}(;
 
     return LandHydrologyModel{FT, typeof(snow), typeof(soil)}(snow, soil)
 end
-
-function ClimaLand.Soil.sublimation_source(
-    bc::AtmosDrivenFluxBCwithSnow{AbstractAtmosphericDrivers{FT}},
-) where {FT}
-    return SoilSublimationwithSnow{FT}()
-end
-
-"""
-    SoilSublimationwithSnow{FT} <: AbstractSoilSource{FT}
-
-Soil Sublimation source type. Used to defined a method
-of `ClimaLand.source!` for soil sublimation with snow present.
-"""
-struct SoilSublimationwithSnow{FT} <: ClimaLand.Soil.AbstractSoilSource{FT} end
-
-"""
-     source!(dY::ClimaCore.Fields.FieldVector,
-             src::SoilSublimationwithSnow{FT},
-             Y::ClimaCore.Fields.FieldVector,
-             p::NamedTuple,
-             model
-             )
-
-Updates dY.soil.θ_i in place with a term due to sublimation; this only affects
-the surface layer of soil.
-
-"""
-function ClimaLand.source!(
-    dY::ClimaCore.Fields.FieldVector,
-    src::SoilSublimationwithSnow{FT},
-    Y::ClimaCore.Fields.FieldVector,
-    p::NamedTuple,
-    model,
-) where {FT}
-    _ρ_i = FT(LP.ρ_cloud_ice(model.parameters.earth_param_set))
-    _ρ_l = FT(LP.ρ_cloud_liq(model.parameters.earth_param_set))
-    z = model.domain.fields.z
-    Δz_top = model.domain.fields.Δz_top # this returns the center-face distance, not layer thickness
-    @. dY.soil.θ_i +=
-        -p.soil.turbulent_fluxes.vapor_flux_ice *
-        (1 - p.snow.snow_cover_fraction) *
-        _ρ_l / _ρ_i * heaviside(z + 2 * Δz_top) # only apply to top layer, recall that z is negative
-end
-
 
 """
     lsm_aux_vars(m::LandHydrologyModel)
@@ -257,10 +183,9 @@ end
 ### Extensions of existing functions to account for prognostic soil/snow
 """
     soil_boundary_fluxes!(
-        bc::AtmosDrivenFluxBCwithSnow,
-        boundary::ClimaLand.TopBoundary,
+        bc::IntegratedAtmosDrivenFluxBC{<:PrescribedAtmosphere, <:PrescribedRadiativeFluxes},
+        components::Val{(:snow, :soil)},
         soil::EnergyHydrology{FT},
-        Δz,
         Y,
         p,
         t,
@@ -272,10 +197,9 @@ energy and water flux at the surface of the soil for use as boundary
 conditions.
 """
 function soil_boundary_fluxes!(
-    bc::AtmosDrivenFluxBCwithSnow,
-    boundary::ClimaLand.TopBoundary,
+    bc::IntegratedAtmosDrivenFluxBC{<:PrescribedAtmosphere, <:PrescribedRadiativeFluxes},
+    components::Val{(:snow, :soil)},
     soil::EnergyHydrology{FT},
-    Δz,
     Y,
     p,
     t,
@@ -296,7 +220,7 @@ function soil_boundary_fluxes!(
         p.soil.infiltration +
         (1 - p.snow.snow_cover_fraction) *
         p.soil.turbulent_fluxes.vapor_flux_liq
-    T_sfc = ClimaLand.Domains.top_center_to_surface(p.soil.T)
+
     @. p.soil.top_bc.heat =
         (1 - p.snow.snow_cover_fraction) * (
             p.soil.R_n +

@@ -32,21 +32,6 @@ struct SoilCanopyModel{
     canopy::VM
 end
 
-"""
-    CanopyRadiativeFluxes{FT} <: AbstractRadiativeDrivers{FT}
-
-A struct used to compute radiative fluxes in land surface models,
-indicating that
-canopy absorption and emission is taken into account when computing
-radiation at the surface of the soil or snow.
-
-The only other alternative at this stage is
-ClimaLand.PrescribedRadiativeFluxes, where the prescribed downwelling
-short and longwave radiative fluxes are used directly,
-without accounting for the canopy. There is a different method
-of the function `soil_boundary_fluxes!` in this case.
-"""
-struct CanopyRadiativeFluxes{FT} <: AbstractRadiativeDrivers{FT} end
 
 
 """
@@ -92,14 +77,19 @@ function SoilCanopyModel{FT}(;
     # These should always be set by the constructor.
     sources = (RootExtraction{FT}(), Soil.PhaseChange{FT}())
     if :runoff ∈ propertynames(land_args)
-        top_bc = ClimaLand.Soil.AtmosDrivenFluxBC(
+        top_bc = ClimaLand.IntegratedAtmosDrivenFluxBC(
             atmos,
-            CanopyRadiativeFluxes{FT}(),
+            radiation,
             land_args.runoff,
-        )
+            (:canopy, :soil, :soilco2),
+)
     else #no runoff model
-        top_bc =
-            ClimaLand.Soil.AtmosDrivenFluxBC(atmos, CanopyRadiativeFluxes{FT}())
+        top_bc = ClimaLand.IntegratedAtmosDrivenFluxBC(
+             atmos,
+            radiation,
+            ClimaLand.Soil.Runoff.NoRunoff(),
+            (:canopy, :soil,:soilco2),
+        )
     end
     zero_flux = Soil.HeatFluxBC((p, t) -> 0.0)
     boundary_conditions = (;
@@ -397,10 +387,9 @@ end
 ### Extensions of existing functions to account for prognostic soil/canopy
 """
     soil_boundary_fluxes!(
-        bc::AtmosDrivenFluxBC{<:PrescribedAtmosphere, <:CanopyRadiativeFluxes},
-        boundary::ClimaLand.TopBoundary,
+        bc::IntegratedAtmosDrivenFluxBC{<:PrescribedAtmosphere, <:PrescribedRadiativeFluxes},
+        components::Val{(:canopy, :soil,:soilco2,)},
         soil::EnergyHydrology{FT},
-        Δz,
         Y,
         p,
         t,
@@ -412,10 +401,9 @@ energy and water flux at the surface of the soil for use as boundary
 conditions.
 """
 function soil_boundary_fluxes!(
-    bc::AtmosDrivenFluxBC{<:PrescribedAtmosphere, <:CanopyRadiativeFluxes},
-    boundary::ClimaLand.TopBoundary,
+    bc::IntegratedAtmosDrivenFluxBC{<:PrescribedAtmosphere, <:PrescribedRadiativeFluxes},
+    components::Val{(:canopy, :soil,:soilco2,)},
     soil::EnergyHydrology{FT},
-    Δz,
     Y,
     p,
     t,
