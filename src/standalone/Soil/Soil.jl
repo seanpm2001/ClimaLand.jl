@@ -100,7 +100,8 @@ export RichardsModel,
     EnergyHydrologyParameters,
     AbstractSoilModel,
     AbstractSoilSource,
-    PhaseChange
+    PhaseChange,
+    sublimation_source
 
 
 

@@ -58,18 +58,12 @@ function LandHydrologyModel{FT}(;
 ) where {FT, SnM <: Snow.SnowModel, SoM <: Soil.EnergyHydrology{FT}}
     (; atmos, radiation) = land_args
     if :runoff ∈ propertynames(land_args)
-        top_bc = ClimaLand.AtmosDrivenFluxBC(
-            atmos,
-            radiation,
-            land_args.runoff,
-            (:snow, :soil),
-        )
+        top_bc = ClimaLand.AtmosDrivenFluxBC(atmos, radiation, land_args.runoff)
     else #no runoff model
         top_bc = AtmosDrivenFluxBC(
             atmos,
             radiation,
             ClimaLand.Soil.Runoff.NoRunoff(),
-            (:snow, :soil),
         )
     end
     sources = (Soil.PhaseChange{FT}(),)
@@ -85,6 +79,7 @@ function LandHydrologyModel{FT}(;
         boundary_conditions = boundary_conditions,
         sources = sources,
         soil_args...,
+        land_components = (:snow, :soil),
     )
     snow = snow_model_type(; atmos = atmos, radiation = radiation, snow_args...)
 
@@ -184,7 +179,7 @@ end
 """
     soil_boundary_fluxes!(
         bc::AtmosDrivenFluxBC{<:PrescribedAtmosphere, <:PrescribedRadiativeFluxes},
-        components::Val{(:snow, :soil)},
+         land_components::Val{(:snow, :soil)},
         soil::EnergyHydrology{FT},
         Y,
         p,
@@ -198,7 +193,7 @@ conditions.
 """
 function soil_boundary_fluxes!(
     bc::AtmosDrivenFluxBC{<:PrescribedAtmosphere, <:PrescribedRadiativeFluxes},
-    components::Val{(:snow, :soil)},
+    land_components::Val{(:snow, :soil)},
     soil::EnergyHydrology{FT},
     Y,
     p,

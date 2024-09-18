@@ -108,6 +108,8 @@ struct EnergyHydrology{FT, PS, D, BCRH, S} <: AbstractSoilModel{FT}
     sources::S
     "A boolean flag which, when false, turns off the horizontal flow of water and heat"
     lateral_flow::Bool
+    "Components"
+    land_components::Tuple
 end
 
 """
@@ -116,7 +118,8 @@ end
         domain::D,
         boundary_conditions::NamedTuple,
         sources::Tuple,
-        lateral_flow::Bool = false
+        lateral_flow::Bool = false,
+         land_components = (:soil,)
     ) where {FT, D, PS}
 
 A constructor for a `EnergyHydrology` model, which sets the default value
@@ -128,19 +131,24 @@ function EnergyHydrology{FT}(;
     boundary_conditions::NamedTuple,
     sources::Tuple,
     lateral_flow::Bool = false,
+    land_components = (:soil,),
 ) where {FT, D, PSE}
     @assert !lateral_flow
     top_bc = boundary_conditions.top
     if typeof(top_bc) <: AtmosDrivenFluxBC
         # If the top BC indicates atmospheric conditions are driving the model
         # add baseflow as a sink term, add sublimation as a sink term
-        subl_source = sublimation_source(Val(top_bc.components), FT)
+        subl_source = sublimation_source(Val(land_components), FT)
         subsurface_source = subsurface_runoff_source(top_bc.runoff)
         sources = append_source(subsurface_source, sources)
         sources = append_source(subl_source, sources)
     end
     args = (parameters, domain, boundary_conditions, sources)
-    EnergyHydrology{FT, typeof.(args)...}(args..., lateral_flow)
+    EnergyHydrology{FT, typeof.(args)...}(
+        args...,
+        lateral_flow,
+        land_components,
+    )
 end
 
 function make_update_boundary_fluxes(model::EnergyHydrology)
@@ -1019,7 +1027,6 @@ function soil_turbulent_fluxes_at_a_point(
         vapor_flux_ice = S̃,
     )
 end
-
 
 # For Swenson/Lawrence 2014 resistance parameterization
 #=

@@ -582,7 +582,6 @@ struct AtmosDrivenFluxBC{
     A <: AbstractAtmosphericDrivers,
     B <: AbstractRadiativeDrivers,
     R <: AbstractRunoffModel,
-    C,
 } <: AbstractEnergyHydrologyBC
     "The atmospheric conditions driving the model"
     atmos::A
@@ -590,21 +589,14 @@ struct AtmosDrivenFluxBC{
     radiation::B
     "The runoff model. The default is no runoff."
     runoff::R
-    "Components"
-    components::C
 end
 
 
-function AtmosDrivenFluxBC(
-    atmos,
-    radiation;
-    runoff = NoRunoff(),
-    components = (:soil,),
-)
+function AtmosDrivenFluxBC(atmos, radiation; runoff = NoRunoff())
     if typeof(runoff) <: NoRunoff
         @info("Warning: No runoff model was provided; zero runoff generated.")
     end
-    args = (atmos, radiation, runoff, components)
+    args = (atmos, radiation, runoff)
     return AtmosDrivenFluxBC{typeof.(args)...}(args...)
 end
 
@@ -718,7 +710,7 @@ function soil_boundary_fluxes!(
     p,
     t,
 ) where {FT}
-    soil_boundary_fluxes!(bc, Val(bc.components), soil, Y, p, t)
+    soil_boundary_fluxes!(bc, Val(soil.land_components), soil, Y, p, t)
 end
 
 
@@ -728,7 +720,7 @@ end
             <:PrescribedAtmosphere,
             <:PrescribedRadiativeFluxes,
         },
-        components::Val{(:soil,)},
+         land_components::Val{(:soil,)},
         model::EnergyHydrology,
         Y,
         p,
@@ -750,7 +742,7 @@ compute the surface fluxes using Monin Obukhov Surface Theory.
 """
 function soil_boundary_fluxes!(
     bc::AtmosDrivenFluxBC{<:PrescribedAtmosphere, <:PrescribedRadiativeFluxes},
-    components::Val{(:soil,)},
+    land_components::Val{(:soil,)},
     model::EnergyHydrology,
     Y,
     p,
@@ -800,10 +792,6 @@ boundary_var_types(
     ::ClimaLand.TopBoundary,
 ) where {FT} = (FT, ClimaCore.Geometry.Covariant3Vector{FT})
 
-
-function sublimation_source(bc::AbstractEnergyHydrologyBC)
-    nothing
-end
 
 function sublimation_source(::Val{(:soil,)}, FT)
     return SoilSublimation{FT}()
