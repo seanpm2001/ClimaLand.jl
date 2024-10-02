@@ -173,3 +173,9 @@ end # Convert from kg C to mol CO2.
 @diagnostic_compute "soil_ice_content" EnergyHydrology Y.soil.θ_i
 @diagnostic_compute "soil_internal_energy" EnergyHydrology Y.soil.ρe_int
 @diagnostic_compute "soil_temperature" EnergyHydrology p.soil.T
+@diagnostic_compute "soil_latent_heat_flux" EnergyHydrology p.soil.turbulent_fluxes.lhf
+@diagnostic_compute "soil_sensible_heat_flux" EnergyHydrology p.soil.turbulent_fluxes.shf
+@diagnostic_compute "vapor_flux" EnergyHydrology p.soil.turbulent_fluxes.vapor_flux_liq # should add ice here
+@diagnostic_compute "sublimation_vapor_flux" EnergyHydrology p.soil.turbulent_fluxes.vapor_flux_ice # should add ice here
+@diagnostic_compute "soil_net_radiation" EnergyHydrology p.soil.R_n
+@diagnostic_compute "rainfall" EnergyHydrology p.drivers.P_liq

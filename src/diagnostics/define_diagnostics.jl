@@ -81,9 +81,19 @@ function define_diagnostics!(land_model)
         long_name = "Liquid water evaporation",
         standard_name = "vapor_flux",
         units = "m s^-1",
-        comments = "Flux of water from the land surface to the atmosphere. E.g., evaporation or sublimation.",
+        comments = "Flux of water from the land surface to the atmosphere in evaporation.",
         compute! = (out, Y, p, t) ->
             compute_vapor_flux!(out, Y, p, t, land_model),
+    )
+
+    add_diagnostic_variable!(
+        short_name = "sublflux",
+        long_name = "Frozen water sublimation",
+        standard_name = "sublimation_vapor_flux",
+        units = "m s^-1",
+        comments = "Flux of water from the land surface to the atmosphere in sublimation.",
+        compute! = (out, Y, p, t) ->
+            compute_sublimation_vapor_flux!(out, Y, p, t, land_model),
     )
 
     # Surface air density
