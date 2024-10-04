@@ -54,7 +54,7 @@ prior = EKP.combine_distributions([prior_g1, prior_g0]);
 # ## Calibration
 
 # Generate the initial ensemble and set up the ensemble Kalman inversion
-N_ensemble = 5
+N_ensemble = 10
 N_iterations = 5
 Γ = 20.0 * EKP.I # Γ adds random noise. About 10% of output average.
 initial_ensemble = EKP.construct_initial_ensemble(prior, N_ensemble);
