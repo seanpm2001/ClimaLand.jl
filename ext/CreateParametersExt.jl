@@ -319,12 +319,19 @@ function EnergyHydrologyParameters(
     K_sat::F,
     S_s::F,
     θ_r::F,
-    PAR_albedo::SF = 0.2,
-    NIR_albedo::SF = 0.4,
+    PAR_albedo_dry::SF = 0.25,
+    NIR_albedo_dry::SF = 0.45,
+    PAR_albedo_wet::SF = 0.15,
+    NIR_albedo_wet::SF = 0.35,
+    ###########DEPRECATED################
+    PAR_albedo::SFD = nothing,
+    NIR_albedo::SFD = nothing,
+    ####################################
     kwargs...,
 ) where {
     F <: Union{<:AbstractFloat, ClimaCore.Fields.Field},
     SF <: Union{<:AbstractFloat, ClimaCore.Fields.Field},
+    SFD <: Union{<:AbstractFloat, ClimaCore.Fields.Field, Nothing},
     C,
 }
     earth_param_set = LP.LandParameters(toml_dict)
@@ -386,9 +393,24 @@ function EnergyHydrologyParameters(
     parameters = CP.get_parameter_values(toml_dict, name_map, "Land")
     PSE = typeof(earth_param_set)
     FT = CP.float_type(toml_dict)
-    EnergyHydrologyParameters{FT, F, SF, C, PSE}(;
-        PAR_albedo,
-        NIR_albedo,
+    if isnothing(PAR_albedo)
+        PAR_albedo_dry = FT.(PAR_albedo_dry)
+        NIR_albedo_dry = FT.(NIR_albedo_dry)
+        PAR_albedo_wet = FT.(PAR_albedo_wet)
+        NIR_albedo_wet = FT.(NIR_albedo_wet)
+    else
+        ###########DEPRECATED################
+        PAR_albedo_dry = PAR_albedo
+        NIR_albedo_dry = NIR_albedo
+        PAR_albedo_wet = PAR_albedo
+        NIR_albedo_wet = NIR_albedo
+        ####################################
+    end
+    EnergyHydrologyParameters{FT, F, typeof(PAR_albedo_dry), C, PSE}(;
+        PAR_albedo_wet,
+        NIR_albedo_wet,
+        PAR_albedo_dry,
+        NIR_albedo_dry,
         ν,
         ν_ss_om,
         ν_ss_quartz,

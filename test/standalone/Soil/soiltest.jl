@@ -231,6 +231,8 @@ for FT in (Float32, Float64)
             FT(288), # γT_ref
             FT(0.2), # NIR_albedo
             FT(0.2), # PAR_albedo
+            FT(0.2), # NIR_albedo
+            FT(0.2), # PAR_albedo
             FT(0.96), # ϵ
             FT(0.001), # z_0m
             FT(0.01), # z_0b
@@ -426,6 +428,8 @@ for FT in (Float32, Float64)
             FT(7),#Ω
             FT(2.64e-2),#γ
             FT(288),#γT_ref
+            FT(0.2),# NIR_albedo
+            FT(0.2), #PAR_albedo
             FT(0.2),# NIR_albedo
             FT(0.2), #PAR_albedo
             FT(0.96),#ϵ

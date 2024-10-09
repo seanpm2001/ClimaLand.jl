@@ -7,7 +7,22 @@ export volumetric_liquid_fraction,
     impedance_factor,
     viscosity_factor,
     dψdϑ,
-    is_saturated
+    is_saturated,
+    soil_albedo_function
+"""
+    soil_albedo_function(albedo_dry::FT, albedo_wet::FT, θ_l::FT)
+
+A pointwise function returning the soil albedo for a radiation band
+given the dry and wet albedos and the liquid fraction.
+"""
+function soil_albedo_function(
+    albedo_dry::FT,
+    albedo_wet::FT,
+    θ_l::FT,
+) where {FT}
+    return albedo_dry * (1 - θ_l) + albedo_wet * θ_l
+end
+
 """
     volumetric_liquid_fraction(ϑ_l::FT, ν_eff::FT, θ_r::FT) where {FT}
 
