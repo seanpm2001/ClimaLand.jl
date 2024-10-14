@@ -1,6 +1,6 @@
 using ..ClimaLand.Canopy
-export plant_absorbed_beer_lambert,
-    plant_absorbed_two_stream,
+export canopy_sw_rt_beer_lambert,
+    canopy_sw_rt_two_stream,
     extinction_coeff,
     compute_G,
     arrhenius_function,
@@ -85,8 +85,7 @@ end
 Computes the PAR and NIR fractional absorbances, reflectances, and tranmittances
 for a canopy in the case of the
 Beer-Lambert model. The absorbances are a function of the radiative transfer
-model, as well as the magnitude of downwelling PAR and NIR radiation in W/m^2,
- the leaf area index, the extinction coefficient, and the
+model, as well as the leaf area index, the extinction coefficient, and the
 soil albedo in the PAR and NIR bands. Returns a
 NamedTuple of NamedTuple, of the form:
 (; par = (; refl = , trans = , abs = ),  nir = (; refl = , trans = , abs = ))
@@ -102,9 +101,9 @@ function compute_fractional_absorbances!(
 ) where {FT}
     RTP = RT.parameters
     @. p.canopy.radiative_transfer.par =
-        plant_absorbed_beer_lambert(RTP.Ω, RTP.α_PAR_leaf, LAI, K, α_soil_PAR)
+        canopy_sw_rt_beer_lambert(RTP.Ω, RTP.α_PAR_leaf, LAI, K, α_soil_PAR)
     @. p.canopy.radiative_transfer.nir =
-        plant_absorbed_beer_lambert(RTP.Ω, RTP.α_NIR_leaf, LAI, K, α_soil_NIR)
+        canopy_sw_rt_beer_lambert(RTP.Ω, RTP.α_NIR_leaf, LAI, K, α_soil_NIR)
 end
 
 """
@@ -121,8 +120,7 @@ end
 Computes the PAR and NIR fractional absorbances, reflectances, and tranmittances
 for a canopy in the case of the
 Two-stream model. The absorbances are a function of the radiative transfer
-model, as well as the magnitude of downwelling PAR and NIR radiation in W/m^2,
-the leaf area index, the extinction coefficient, and the
+model, as well as the leaf area index, the extinction coefficient, and the
 soil albedo in the PAR and NIR bands.
 
 This model also depends on the diffuse fraction and the zenith angle.
@@ -141,7 +139,7 @@ function compute_fractional_absorbances!(
     frac_diff,
 ) where {FT}
     RTP = RT.parameters
-    @. p.canopy.radiative_transfer.par = plant_absorbed_two_stream(
+    @. p.canopy.radiative_transfer.par = canopy_sw_rt_two_stream(
         p.canopy.radiative_transfer.G,
         RTP.Ω,
         RTP.n_layers,
@@ -153,7 +151,7 @@ function compute_fractional_absorbances!(
         α_soil_PAR,
         frac_diff,
     )
-    @. p.canopy.radiative_transfer.nir = plant_absorbed_two_stream(
+    @. p.canopy.radiative_transfer.nir = canopy_sw_rt_two_stream(
         p.canopy.radiative_transfer.G,
         RTP.Ω,
         RTP.n_layers,
@@ -168,7 +166,7 @@ function compute_fractional_absorbances!(
 end
 
 """
-    plant_absorbed_beer_lambert(
+    canopy_sw_rt_beer_lambert(
         Ω::FT,
         SW_d:FT,
         α_leaf::FT,
@@ -185,7 +183,7 @@ and the albedo of the soil (`α_soil`).
 
 Returns a tuple of reflected, absorbed, and transmitted radiation fractions.
 """
-function plant_absorbed_beer_lambert(
+function canopy_sw_rt_beer_lambert(
     Ω::FT,
     α_leaf::FT,
     LAI::FT,
@@ -199,7 +197,7 @@ function plant_absorbed_beer_lambert(
 end
 
 """
-    plant_absorbed_two_stream(
+    canopy_sw_rt_two_stream(
         G::FT,
         Ω::FT,
         n_layers::UInt64,
@@ -213,8 +211,7 @@ end
         frac_diff::FT,
     )
 
-Computes the absorbed, transmitted, and reflected  photon flux density
-in terms of mol photons  per m^2 per second for a radiation band.
+Computes the absorbed, reflected, and transmitted flux fractions by radiation band.
 
 This applies the two-stream radiative transfer solution which takes into account
 the impacts of scattering within the canopy. The function takes in all
@@ -222,10 +219,9 @@ parameters from the parameter struct of a TwoStreamModel, along with the
 incident radiation, LAI, extinction coefficient K, soil albedo from the
 canopy soil_driver, solar zenith angle, and τ.
 
-Returns a tuple of reflected, absorbed, and transmitted radiation in
-mol photons/m^2/s.
+Returns a tuple of reflected, absorbed, and transmitted radiation fractions.
 """
-function plant_absorbed_two_stream(
+function canopy_sw_rt_two_stream(
     G::FT,
     Ω::FT,
     n_layers::UInt64,

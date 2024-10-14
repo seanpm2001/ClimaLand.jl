@@ -61,8 +61,6 @@ Base.@kwdef struct BeerLambertParameters{
     Ω::FT
     "Typical wavelength per PAR photon (m)"
     λ_γ_PAR::FT
-    "Typical wavelength per NIR photon (m)"
-    λ_γ_NIR::FT
     "Leaf angle distribution function"
     G_Function::G
 end
@@ -105,8 +103,6 @@ Base.@kwdef struct TwoStreamParameters{
     Ω::FT
     "Typical wavelength per PAR photon (m)"
     λ_γ_PAR::FT
-    "Typical wavelength per NIR photon (m)"
-    λ_γ_NIR::FT
     "Number of layers to partition the canopy into when integrating the
     absorption over the canopy vertically. Unrelated to the number of layers in
     the vertical discretization of the canopy for the plant hydraulics model.
@@ -219,7 +215,7 @@ ClimaLand.auxiliary_domain_names(::Union{BeerLambertModel, TwoStreamModel}) = (
                                  ) where {PSE}
 
 
-Computes and stores the net long and short wave radition, in W/m^2,
+Computes and stores the net long and short wave radiation, in W/m^2, over all bands,
 absorbed by the canopy when the canopy is run in standalone mode, with only
 a :canopy model as a prognostic component,
 with PrescribedGroundConditions.
