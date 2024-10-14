@@ -176,7 +176,7 @@ Base.broadcastable(RT::AbstractRadiationModel) = tuple(RT)
 
 ClimaLand.name(model::AbstractRadiationModel) = :radiative_transfer
 ClimaLand.auxiliary_vars(model::Union{BeerLambertModel, TwoStreamModel}) =
-    (:inc_nir, :inc_par, :nir, :par, :LW_n, :SW_n, :ϵ, :frac_diff, :G, :K)
+    (:nir_d, :par_d, :nir, :par, :LW_n, :SW_n, :ϵ, :frac_diff, :G, :K)
 ClimaLand.auxiliary_types(
     model::Union{BeerLambertModel{FT}, TwoStreamModel{FT}},
 ) where {FT} = (
@@ -233,12 +233,11 @@ function canopy_radiant_energy_fluxes!(
     t,
 ) where {PSE}
     FT = eltype(earth_param_set)
-    inc_par = p.canopy.radiative_transfer.inc_par
-    inc_nir = p.canopy.radiative_transfer.inc_nir
+    par_d = p.canopy.radiative_transfer.par_d
+    nir_d = p.canopy.radiative_transfer.nir_d
     f_abs_par = p.canopy.radiative_transfer.par.abs
     f_abs_nir = p.canopy.radiative_transfer.nir.abs
-    @. p.canopy.radiative_transfer.SW_n =
-        f_abs_par * inc_par + f_abs_nir * inc_nir
+    @. p.canopy.radiative_transfer.SW_n = f_abs_par * par_d + f_abs_nir * nir_d
     ϵ_canopy = p.canopy.radiative_transfer.ϵ # this takes into account LAI/SAI
     # Long wave: use ground conditions from the ground driver
     T_ground::FT = ground.T(t)

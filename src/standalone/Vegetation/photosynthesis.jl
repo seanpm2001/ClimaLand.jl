@@ -126,14 +126,14 @@ end
         c_co2,
         R,
         energy_per_mole_photon_par,
-        inc_par,
+        par_d,
 )
 
 Computes the net photosynthesis rate `An` for the Farquhar model, along with the
 dark respiration `Rd`, and updates them in place.
 
 To do so, we require the canopy leaf temperature `T`, Medlyn factor, fraction
-of `inc_par` aborbed `f_abs`, CO2 concentration in the atmosphere,
+of `par_d` aborbed `f_abs`, CO2 concentration in the atmosphere,
 moisture stress factor `β` (unitless), and the universal gas constant
 `R`.
 
@@ -152,7 +152,7 @@ function update_photosynthesis!(
     c_co2,
     R,
     energy_per_mole_photon_par,
-    inc_par,
+    par_d,
 )
     (;
         Vcmax25,
@@ -180,7 +180,7 @@ function update_photosynthesis!(
         T,
         β,
         Rd,
-        f_abs * inc_par / energy_per_mole_photon_par, # This function requires flux in moles of photons, not J
+        f_abs * par_d / energy_per_mole_photon_par, # This function requires flux in moles of photons, not J
         c_co2,
         medlyn_factor,
         R,

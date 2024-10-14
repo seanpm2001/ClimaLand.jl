@@ -94,13 +94,13 @@ ClimaLand.auxiliary_domain_names(::OptimalityFarquharModel) =
         c_co2,
         R,
         energy_per_mole_photon_par,
-        inc_par,
+        par_d,
     )
 Computes the net photosynthesis rate `An` for the Optimality Farquhar model, along with the
 dark respiration `Rd`, and the value of `Vcmax25`, and updates them in place.
 
  To do so, we require the canopy leaf temperature `T`, Medlyn factor, fraction of
-PAR radiation absorbed `f_abs`, incoming PAR radiation `inc_par` in W/m^2,
+PAR radiation absorbed `f_abs`, incoming PAR radiation `par_d` in W/m^2,
  CO2 concentration in the atmosphere,
 moisture stress factor `β` (unitless), and the universal gas constant
 `R`.
@@ -120,7 +120,7 @@ function update_photosynthesis!(
     c_co2,
     R,
     energy_per_mole_photon_par,
-    inc_par,
+    par_d,
 )
     (;
         Γstar25,
@@ -146,7 +146,7 @@ function update_photosynthesis!(
     Ko = MM_Ko.(Ko25, ΔHko, T, To, R)
     rates =
         optimality_max_photosynthetic_rates.(
-            f_abs * inc_par / energy_per_mole_photon_par,
+            f_abs * par_d / energy_per_mole_photon_par,
             θj,
             ϕ,
             oi,
@@ -160,7 +160,7 @@ function update_photosynthesis!(
     Vcmax = rates.:2
     J =
         electron_transport.(
-            f_abs * inc_par / energy_per_mole_photon_par,
+            f_abs * par_d / energy_per_mole_photon_par,
             Jmax,
             θj,
             ϕ,

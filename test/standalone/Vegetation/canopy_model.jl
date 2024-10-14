@@ -285,10 +285,10 @@ import ClimaParams
             _σ = FT(LP.Stefan(earth_param_set))
             f_abs_par = p.canopy.radiative_transfer.par.abs
             f_abs_nir = p.canopy.radiative_transfer.nir.abs
-            inc_nir = p.canopy.radiative_transfer.inc_nir
-            inc_par = p.canopy.radiative_transfer.inc_par
+            nir_d = p.canopy.radiative_transfer.nir_d
+            par_d = p.canopy.radiative_transfer.par_d
             @test p.canopy.radiative_transfer.SW_n ==
-                  @. f_abs_par * inc_par + f_abs_nir * inc_nir
+                  @. f_abs_par * par_d + f_abs_nir * nir_d
             ϵ_canopy = p.canopy.radiative_transfer.ϵ
             T_canopy = FT.(T_atmos(t0))
             T_soil = FT.(soil_driver.T(t0))

@@ -57,7 +57,7 @@ for FT in (Float32, Float64)
         c_co2 = FT(4.8e-4)
         R = FT(LP.gas_constant(earth_param_set))
         f_abs = FT(0.5)
-        inc_par = FT(1)
+        par_d = FT(1)
         λ_γ_PAR = FT(5e-7)
         energy_per_mole_photon_par = planck_h * c_light / λ_γ_PAR * N_a
         ClimaLand.Canopy.update_photosynthesis!(
@@ -72,7 +72,7 @@ for FT in (Float32, Float64)
             c_co2,
             R,
             energy_per_mole_photon_par,
-            inc_par,
+            par_d,
         )
         @test Rd[1] != 0.0
         @test Vcmax25[1] != 0.0

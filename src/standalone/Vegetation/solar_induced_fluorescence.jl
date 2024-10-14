@@ -77,12 +77,12 @@ function update_SIF!(
     T_freeze,
     photosynthesis_parameters,
     energy_per_mole_photon_par,
-    inc_par,
+    par_d,
 )
     (; ΔHJmax, To, θj, ϕ) = photosynthesis_parameters
     sif_parameters = sif_model.parameters
     @. SIF = compute_SIF_at_a_point(
-        inc_par * f_abs_par / energy_per_mole_photon_par,
+        par_d * f_abs_par / energy_per_mole_photon_par,
         Tc,
         Vcmax25,
         R,

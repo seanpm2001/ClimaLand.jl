@@ -390,8 +390,8 @@ function lsm_radiant_energy_fluxes!(
     R_net_soil = p.soil.R_n
     LW_u = p.LW_u
     SW_u = p.SW_u
-    inc_par = p.canopy.radiative_transfer.inc_par
-    inc_nir = p.canopy.radiative_transfer.inc_nir
+    par_d = p.canopy.radiative_transfer.par_d
+    nir_d = p.canopy.radiative_transfer.nir_d
     f_abs_par = p.canopy.radiative_transfer.par.abs
     f_abs_nir = p.canopy.radiative_transfer.nir.abs
     f_refl_par = p.canopy.radiative_transfer.par.refl
@@ -400,16 +400,16 @@ function lsm_radiant_energy_fluxes!(
     f_trans_nir = p.canopy.radiative_transfer.nir.trans
     # in total: d - u = CANOPY_ABS + (1-α_soil)*CANOPY_TRANS
     # SW upwelling  = reflected par + reflected nir
-    @. SW_u = inc_par * f_refl_par + f_refl_nir * inc_nir
+    @. SW_u = par_d * f_refl_par + f_refl_nir * nir_d
 
     # net canopy
-    @. SW_net_canopy = f_abs_par * inc_par + f_abs_nir * inc_nir
+    @. SW_net_canopy = f_abs_par * par_d + f_abs_nir * nir_d
 
 
     # net soil = (1-α)*trans for par and nir
     @. R_net_soil .=
-        f_trans_nir * inc_nir * (1 - α_soil_NIR) +
-        f_trans_par * inc_par * (1 - α_soil_PAR)
+        f_trans_nir * nir_d * (1 - α_soil_NIR) +
+        f_trans_par * par_d * (1 - α_soil_PAR)
 
     ϵ_canopy = p.canopy.radiative_transfer.ϵ # this takes into account LAI/SAI
     @. LW_d_canopy = ((1 - ϵ_canopy) * LW_d + ϵ_canopy * _σ * T_canopy^4) # double checked

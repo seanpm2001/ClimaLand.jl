@@ -412,8 +412,8 @@ function ClimaLand.make_update_aux(
         ψ = p.canopy.hydraulics.ψ
         ϑ_l = Y.canopy.hydraulics.ϑ_l
         fa = p.canopy.hydraulics.fa
-        inc_par = p.canopy.radiative_transfer.inc_par
-        inc_nir = p.canopy.radiative_transfer.inc_nir
+        par_d = p.canopy.radiative_transfer.par_d
+        nir_d = p.canopy.radiative_transfer.nir_d
         frac_diff = p.canopy.radiative_transfer.frac_diff
 
         bc = canopy.boundary_conditions
@@ -451,8 +451,8 @@ function ClimaLand.make_update_aux(
             (1 - exp(-(LAI + SAI))) #from CLM 5.0, Tech note 4.20
         p.canopy.radiative_transfer.G .= compute_G(G_Function, θs)
         RT = canopy.radiative_transfer
-        compute_PAR!(inc_par, RT, bc.radiation, p, t)
-        compute_NIR!(inc_nir, RT, bc.radiation, p, t)
+        compute_PAR!(par_d, RT, bc.radiation, p, t)
+        compute_NIR!(nir_d, RT, bc.radiation, p, t)
         K = p.canopy.radiative_transfer.K
         @. K = extinction_coeff(p.canopy.radiative_transfer.G, θs)
         DOY =
@@ -567,7 +567,7 @@ function ClimaLand.make_update_aux(
             c_co2_air,
             R,
             energy_per_mole_photon_par,
-            inc_par,
+            par_d,
         )
         # update SIF
         SIF = p.canopy.sif.SIF
@@ -581,7 +581,7 @@ function ClimaLand.make_update_aux(
             T_freeze,
             canopy.photosynthesis.parameters,
             energy_per_mole_photon_par,
-            inc_par,
+            par_d,
         )
         @. GPP = compute_GPP(An, K, LAI, Ω)
         @. gs = medlyn_conductance(g0, Drel, medlyn_factor, An, c_co2_air)
