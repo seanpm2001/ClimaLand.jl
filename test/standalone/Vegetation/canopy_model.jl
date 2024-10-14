@@ -1187,15 +1187,9 @@ end
             Ω = FT(0.69)
             G_Function = CLMGFunction(χl)
             λ_γ_PAR = FT(5e-7)
-            λ_γ_NIR = FT(1.65e-6)
             ϵ_canopy = FT(0.97)
-            BeerLambertparams = BeerLambertParameters(
-                FT;
-                α_PAR_leaf,
-                α_NIR_leaf,
-                λ_γ_PAR,
-                λ_γ_NIR,
-            )
+            BeerLambertparams =
+                BeerLambertParameters(FT; α_PAR_leaf, α_NIR_leaf, λ_γ_PAR)
             TwoStreamparams = TwoStreamParameters(
                 FT;
                 Ω,
