@@ -138,11 +138,13 @@ function update_photosynthesis!(
     Vcmax25field,
     model::FarquharModel,
     T,
-    APAR,
+    f_abs,
     β,
     medlyn_factor,
     c_co2,
     R,
+    energy_per_mole_photon_par,
+    inc_par,
 )
     (;
         Vcmax25,
@@ -170,7 +172,7 @@ function update_photosynthesis!(
         T,
         β,
         Rd,
-        APAR,
+        f_abs * inc_par / energy_per_mole_photon_par,
         c_co2,
         medlyn_factor,
         R,

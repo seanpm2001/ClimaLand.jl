@@ -85,11 +85,13 @@ ClimaLand.auxiliary_domain_names(::OptimalityFarquharModel) =
     update_photosynthesis!(Rd, An, Vcmax25,
         model::OptimalityFarquharModel,
         T,
-        APAR,
+        f_abs,
         β,
         medlyn_factor,
         c_co2,
         R,
+    energy_per_mole_photon_par,
+    inc_par
     )
 
 Computes the net photosynthesis rate `An` for the Optimality Farquhar model, along with the
@@ -106,11 +108,13 @@ function update_photosynthesis!(
     Vcmax25,
     model::OptimalityFarquharModel,
     T,
-    APAR,
+    f_abs,
     β,
     medlyn_factor,
     c_co2,
     R,
+    energy_per_mole_photon_par,
+    inc_par,
 )
     (;
         Γstar25,
@@ -136,7 +140,7 @@ function update_photosynthesis!(
     Ko = MM_Ko.(Ko25, ΔHko, T, To, R)
     rates =
         optimality_max_photosynthetic_rates.(
-            APAR,
+            f_abs * inc_par / energy_per_mole_photon_par,
             θj,
             ϕ,
             oi,
@@ -148,7 +152,13 @@ function update_photosynthesis!(
         )
     Jmax = rates.:1
     Vcmax = rates.:2
-    J = electron_transport.(APAR, Jmax, θj, ϕ)
+    J =
+        electron_transport.(
+            f_abs * inc_par / energy_per_mole_photon_par,
+            Jmax,
+            θj,
+            ϕ,
+        )
     Aj = light_assimilation.(is_c3, J, ci, Γstar)
     Ac = rubisco_assimilation.(is_c3, Vcmax, ci, Γstar, Kc, Ko, oi)
 

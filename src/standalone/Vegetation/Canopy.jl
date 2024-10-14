@@ -436,10 +436,8 @@ function ClimaLand.make_update_aux(
         R = FT(LP.gas_constant(earth_param_set))
         T_freeze = FT(LP.T_freeze(earth_param_set))
         thermo_params = earth_param_set.thermo_params
-        (; G_Function, Ω, λ_γ_PAR, λ_γ_NIR) =
-            canopy.radiative_transfer.parameters
-        energy_per_photon_PAR = planck_h * c / λ_γ_PAR
-        energy_per_photon_NIR = planck_h * c / λ_γ_NIR
+        (; G_Function, Ω, λ_γ_PAR) = canopy.radiative_transfer.parameters
+        energy_per_mole_photon_par = planck_h * c / λ_γ_PAR * N_a
         (; g1, g0, Drel) = canopy.conductance.parameters
         area_index = p.canopy.hydraulics.area_index
         LAI = area_index.leaf
@@ -469,11 +467,9 @@ function ClimaLand.make_update_aux(
             thermo_params,
         )
 
-        compute_absorbances!(
+        compute_fractional_absorbances!(
             p,
             RT,
-            inc_par,
-            inc_nir,
             LAI,
             K,
             ground_albedo_PAR(
@@ -490,9 +486,6 @@ function ClimaLand.make_update_aux(
                 p,
                 t,
             ),
-            energy_per_photon_PAR,
-            energy_per_photon_NIR,
-            N_a,
             θs,
             frac_diff,
         )
@@ -573,6 +566,8 @@ function ClimaLand.make_update_aux(
             medlyn_factor,
             c_co2_air,
             R,
+            energy_per_mole_photon_par,
+            inc_par,
         )
         # update SIF
         SIF = p.canopy.sif.SIF
@@ -585,6 +580,8 @@ function ClimaLand.make_update_aux(
             R,
             T_freeze,
             canopy.photosynthesis.parameters,
+            energy_per_mole_photon_par,
+            inc_par,
         )
         @. GPP = compute_GPP(An, K, LAI, Ω)
         @. gs = medlyn_conductance(g0, Drel, medlyn_factor, An, c_co2_air)

@@ -237,20 +237,12 @@ function canopy_radiant_energy_fluxes!(
     t,
 ) where {PSE}
     FT = eltype(earth_param_set)
-
-    # Short wave makes use of precomputed APAR and ANIR
-    # in moles of photons per m^2 per s
-    c = FT(LP.light_speed(earth_param_set))
-    h = FT(LP.planck_constant(earth_param_set))
-    N_a = FT(LP.avogadro_constant(earth_param_set))
-    (; α_PAR_leaf, λ_γ_PAR, λ_γ_NIR) = canopy.radiative_transfer.parameters
-    APAR = p.canopy.radiative_transfer.par.abs
-    ANIR = p.canopy.radiative_transfer.nir.abs
-    energy_per_photon_PAR = h * c / λ_γ_PAR
-    energy_per_photon_NIR = h * c / λ_γ_NIR
+    inc_par = p.canopy.radiative_transfer.inc_par
+    inc_nir = p.canopy.radiative_transfer.inc_nir
+    f_abs_par = p.canopy.radiative_transfer.par.abs
+    f_abs_nir = p.canopy.radiative_transfer.nir.abs
     @. p.canopy.radiative_transfer.SW_n =
-        (energy_per_photon_PAR * N_a * APAR) +
-        (energy_per_photon_NIR * N_a * ANIR)
+        f_abs_par * inc_par + f_abs_nir * inc_nir
     ϵ_canopy = p.canopy.radiative_transfer.ϵ # this takes into account LAI/SAI
     # Long wave: use ground conditions from the ground driver
     T_ground::FT = ground.T(t)

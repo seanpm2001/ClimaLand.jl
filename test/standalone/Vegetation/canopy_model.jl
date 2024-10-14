@@ -282,20 +282,13 @@ import ClimaParams
             @test p.canopy.energy.turbulent_fluxes.lhf == turb_fluxes.lhf
             @test p.canopy.energy.turbulent_fluxes.transpiration ==
                   turb_fluxes.transpiration
-            c = FT(LP.light_speed(earth_param_set))
-            h = FT(LP.planck_constant(earth_param_set))
-            N_a = FT(LP.avogadro_constant(earth_param_set))
             _σ = FT(LP.Stefan(earth_param_set))
-            (; α_PAR_leaf, λ_γ_PAR, λ_γ_NIR) =
-                canopy.radiative_transfer.parameters
-            APAR = p.canopy.radiative_transfer.par.abs
-            ANIR = p.canopy.radiative_transfer.nir.abs
-            energy_per_photon_PAR = h * c / λ_γ_PAR
-            energy_per_photon_NIR = h * c / λ_γ_NIR
-
+            f_abs_par = p.canopy.radiative_transfer.par.abs
+            f_abs_nir = p.canopy.radiative_transfer.nir.abs
+            inc_nir = p.canopy.radiative_transfer.inc_nir
+            inc_par = p.canopy.radiative_transfer.inc_par
             @test p.canopy.radiative_transfer.SW_n ==
-                  @. (energy_per_photon_PAR * N_a * APAR) +
-                     (energy_per_photon_NIR * N_a * ANIR)
+                  @. f_abs_par * inc_par + f_abs_nir * inc_nir
             ϵ_canopy = p.canopy.radiative_transfer.ϵ
             T_canopy = FT.(T_atmos(t0))
             T_soil = FT.(soil_driver.T(t0))
