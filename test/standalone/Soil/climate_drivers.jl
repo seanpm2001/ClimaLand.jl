@@ -149,7 +149,7 @@ for FT in (Float32, Float64)
                 :top_θ_l,
                 :top_volume,
                 :clipped_depths,
-                :subsfc_scratch,
+                :clipped_values,
                 :infiltration,
                 :bottom_bc,
             )

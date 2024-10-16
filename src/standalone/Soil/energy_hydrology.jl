@@ -546,25 +546,25 @@ function ClimaLand.make_update_aux(model::EnergyHydrology)
                 sqrt(eps(eltype(model.domain.fields.Δz_top)))
             ∫H_θ_l_dz = p.soil.top_θ_l
             ∫H_dz = p.soil.top_volume
-            @. p.soil.subsfc_scratch =
+            @. p.soil.clipped_values =
                 ClimaLand.heaviside.(p.soil.sfc_scratch, p.soil.clipped_depths)
-            column_integral_definite!(∫H_dz, p.soil.subsfc_scratch)
-            @. p.soil.subsfc_scratch =
+            column_integral_definite!(∫H_dz, p.soil.clipped_values)
+            @. p.soil.clipped_values =
                 ClimaLand.heaviside.(
                     p.soil.sfc_scratch,
                     p.soil.clipped_depths,
                 ) * p.soil.θ_l
-            column_integral_definite!(∫H_θ_l_dz, p.soil.subsfc_scratch)
-            @. p.soil.subsfc_scratch = ∫H_θ_l_dz / ∫H_dz
+            column_integral_definite!(∫H_θ_l_dz, p.soil.clipped_values)
+            @. p.soil.sfc_scratch = ∫H_θ_l_dz / ∫H_dz
             @. p.soil.PAR_albedo = soil_albedo_function(
                 model.parameters.PAR_albedo_dry,
                 model.parameters.PAR_albedo_wet,
-                p.soil.subsfc_scratch,
+                p.soil.sfc_scratch,
             )
             @. p.soil.NIR_albedo = soil_albedo_function(
                 model.parameters.NIR_albedo_dry,
                 model.parameters.NIR_albedo_wet,
-                p.soil.subsfc_scratch,
+                p.soil.sfc_scratch,
             )
         end
 
