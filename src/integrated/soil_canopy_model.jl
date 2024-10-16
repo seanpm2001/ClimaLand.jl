@@ -107,7 +107,7 @@ function SoilCanopyModel{FT}(;
     )
 
     transpiration = Canopy.PlantHydraulics.DiagnosticTranspiration{FT}()
-    canopy_soil_driver = PrognosticSoil{}()
+    canopy_soil_driver = PrognosticSoil
     if :energy in propertynames(canopy_component_args)
 
         canopy = Canopy.CanopyModel{FT}(;
@@ -426,7 +426,7 @@ Concrete type of AbstractSoilDriver used for dispatch in cases where both
 a canopy model and soil model are run.
 $(DocStringExtensions.FIELDS)
 """
-struct PrognosticSoil{} <: AbstractSoilDriver end
+abstract type PrognosticSoil <: AbstractSoilDriver end
 
 
 """
@@ -464,7 +464,7 @@ end
 """
     root_energy_flux_per_ground_area!(
         fa_energy::ClimaCore.Fields.Field,
-        s::PrognosticSoil{F},
+        s::PrognosticSoil,
         model::Canopy.AbstractCanopyEnergyModel{FT},
         Y::ClimaCore.Fields.FieldVector,
         p::NamedTuple,
@@ -485,12 +485,12 @@ must account for it as well.
 """
 function Canopy.root_energy_flux_per_ground_area!(
     fa_energy::ClimaCore.Fields.Field,
-    s::PrognosticSoil{F},
+    s::PrognosticSoil,
     model::Canopy.AbstractCanopyEnergyModel{FT},
     Y::ClimaCore.Fields.FieldVector,
     p::NamedTuple,
     t,
-) where {FT, F}
+) where {FT}
     ClimaCore.Operators.column_integral_definite!(
         fa_energy,
         p.root_energy_extraction,
@@ -537,7 +537,7 @@ end
 
 """
     Canopy.canopy_radiant_energy_fluxes!(p::NamedTuple,
-                                         s::PrognosticSoil{F},
+                                         s::PrognosticSoil,
                                          canopy,
                                          radiation::PrescribedRadiativeFluxes,
                                          earth_param_set::PSE,
@@ -557,13 +557,13 @@ and `p.canopy.radiative_transfer.SW_n`.
 """
 function Canopy.canopy_radiant_energy_fluxes!(
     p::NamedTuple,
-    s::PrognosticSoil{F},
+    s::PrognosticSoil,
     canopy,
     radiation::PrescribedRadiativeFluxes,
     earth_param_set::PSE,
     Y::ClimaCore.Fields.FieldVector,
     t,
-) where {F, PSE}
+) where {PSE}
     nothing
 end
 function ClimaLand.Soil.sublimation_source(
