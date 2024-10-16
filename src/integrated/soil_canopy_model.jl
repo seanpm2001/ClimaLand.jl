@@ -107,7 +107,7 @@ function SoilCanopyModel{FT}(;
     )
 
     transpiration = Canopy.PlantHydraulics.DiagnosticTranspiration{FT}()
-    canopy_soil_driver = PrognosticSoil
+    canopy_soil_driver = PrognosticSoil()
     if :energy in propertynames(canopy_component_args)
 
         canopy = Canopy.CanopyModel{FT}(;
@@ -426,7 +426,7 @@ Concrete type of AbstractSoilDriver used for dispatch in cases where both
 a canopy model and soil model are run.
 $(DocStringExtensions.FIELDS)
 """
-abstract type PrognosticSoil <: AbstractSoilDriver end
+struct PrognosticSoil <: AbstractSoilDriver end
 
 
 """
