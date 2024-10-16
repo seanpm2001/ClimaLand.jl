@@ -107,10 +107,7 @@ function SoilCanopyModel{FT}(;
     )
 
     transpiration = Canopy.PlantHydraulics.DiagnosticTranspiration{FT}()
-    canopy_soil_driver = PrognosticSoil{typeof(soil.parameters.PAR_albedo)}(
-        soil.parameters.PAR_albedo,
-        soil.parameters.NIR_albedo,
-    )
+    canopy_soil_driver = PrognosticSoil{}()
     if :energy in propertynames(canopy_component_args)
 
         canopy = Canopy.CanopyModel{FT}(;
@@ -342,8 +339,8 @@ function lsm_radiant_energy_fluxes!(
         ClimaLand.Canopy.canopy_temperature(canopy.energy, canopy, Y, p, t)
     p.T_ground .= surface_temperature(ground_model, Y, p, t)
 
-    α_soil_PAR = Canopy.ground_albedo_PAR(canopy.soil_driver, Y, p, t)
-    α_soil_NIR = Canopy.ground_albedo_NIR(canopy.soil_driver, Y, p, t)
+    α_soil_PAR = p.soil.PAR_albedo
+    α_soil_NIR = p.soil.NIR_albedo
     ϵ_soil = ground_model.parameters.emissivity
 
     # in W/m^2
@@ -429,21 +426,7 @@ Concrete type of AbstractSoilDriver used for dispatch in cases where both
 a canopy model and soil model are run.
 $(DocStringExtensions.FIELDS)
 """
-struct PrognosticSoil{F <: Union{AbstractFloat, ClimaCore.Fields.Field}} <:
-       AbstractSoilDriver
-    "Soil albedo for PAR"
-    α_PAR::F
-    "Soil albedo for NIR"
-    α_NIR::F
-end
-
-function Canopy.ground_albedo_PAR(soil_driver::PrognosticSoil, Y, p, t)
-    return soil_driver.α_PAR
-end
-
-function Canopy.ground_albedo_NIR(soil_driver::PrognosticSoil, Y, p, t)
-    return soil_driver.α_NIR
-end
+struct PrognosticSoil{} <: AbstractSoilDriver end
 
 
 """

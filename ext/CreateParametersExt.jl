@@ -320,9 +320,9 @@ function EnergyHydrologyParameters(
     S_s::F,
     θ_r::F,
     PAR_albedo_dry::SF = 0.25,
-    NIR_albedo_dry::SF = 0.45,
+    NIR_albedo_dry::SF = 0.4,
     PAR_albedo_wet::SF = 0.15,
-    NIR_albedo_wet::SF = 0.35,
+    NIR_albedo_wet::SF = 0.3,
     ###########DEPRECATED################
     PAR_albedo::SFD = nothing,
     NIR_albedo::SFD = nothing,

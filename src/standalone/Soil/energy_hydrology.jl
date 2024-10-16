@@ -1,3 +1,5 @@
+using ClimaCore.Operators: column_integral_definite!
+
 """
     EnergyHydrologyParameters{
             FT <: AbstractFloat,
@@ -453,8 +455,6 @@ ClimaLand.auxiliary_vars(soil::EnergyHydrology) = (
     :θ_l,
     :T,
     :κ,
-    :PAR_albedo,
-    :NIR_albedo,
     boundary_vars(soil.boundary_conditions.top, ClimaLand.TopBoundary())...,
     boundary_vars(
         soil.boundary_conditions.bottom,
@@ -469,8 +469,6 @@ A function which returns the types of the auxiliary variables
 of `EnergyHydrology`.
 """
 ClimaLand.auxiliary_types(soil::EnergyHydrology{FT}) where {FT} = (
-    FT,
-    FT,
     FT,
     FT,
     FT,
@@ -494,8 +492,6 @@ ClimaLand.auxiliary_domain_names(soil::EnergyHydrology) = (
     :subsurface,
     :subsurface,
     :subsurface,
-    :surface,
-    :surface,
     boundary_var_domain_names(
         soil.boundary_conditions.top,
         ClimaLand.TopBoundary(),
@@ -540,29 +536,37 @@ function ClimaLand.make_update_aux(model::EnergyHydrology)
 
         @. p.soil.θ_l =
             volumetric_liquid_fraction(Y.soil.ϑ_l, ν - Y.soil.θ_i, θ_r)
-        # TODO: Add a 0-7 cm thetha_l average to aux vars
-        ClimaLand.Domains.average_seven_to_surface!(
-            p.soil.PAR_albedo,
-            p.soil.θ_l,
-            model.domain.fields.z,
-            model.domain.fields.Δz_top,
-        )
-        ClimaLand.Domains.average_seven_to_surface!(
-            p.soil.NIR_albedo,
-            p.soil.θ_l,
-            model.domain.fields.z,
-            model.domain.fields.Δz_top,
-        )
-        @. p.soil.PAR_albedo = soil_albedo_function(
-            model.parameters.PAR_albedo_dry,
-            model.parameters.PAR_albedo_wet,
-            p.soil.PAR_albedo,
-        )
-        @. p.soil.NIR_albedo = soil_albedo_function(
-            model.parameters.NIR_albedo_dry,
-            model.parameters.NIR_albedo_wet,
-            p.soil.NIR_albedo,
-        )
+        if model.boundary_conditions isa AtmosDrivenFluxBC
+            @. p.soil.clipped_depths =
+                model.domain.fields.z_sfc - model.domain.fields.z
+            # println(typeof(model.domain.fields.Δz_top))
+            # println(typeof(p.soil.subsfc_scratch))
+            @. p.soil.sfc_scratch =
+                max(model.domain.fields.Δz_top, 7) +
+                sqrt(eps(eltype(model.domain.fields.Δz_top)))
+            ∫H_θ_l_dz = p.soil.top_θ_l
+            ∫H_dz = p.soil.top_volume
+            @. p.soil.subsfc_scratch =
+                ClimaLand.heaviside.(p.soil.sfc_scratch, p.soil.clipped_depths)
+            column_integral_definite!(∫H_dz, p.soil.subsfc_scratch)
+            @. p.soil.subsfc_scratch =
+                ClimaLand.heaviside.(
+                    p.soil.sfc_scratch,
+                    p.soil.clipped_depths,
+                ) * p.soil.θ_l
+            column_integral_definite!(∫H_θ_l_dz, p.soil.subsfc_scratch)
+            @. p.soil.subsfc_scratch = ∫H_θ_l_dz / ∫H_dz
+            @. p.soil.PAR_albedo = soil_albedo_function(
+                model.parameters.PAR_albedo_dry,
+                model.parameters.PAR_albedo_wet,
+                p.soil.subsfc_scratch,
+            )
+            @. p.soil.NIR_albedo = soil_albedo_function(
+                model.parameters.NIR_albedo_dry,
+                model.parameters.NIR_albedo_wet,
+                p.soil.subsfc_scratch,
+            )
+        end
 
         @. p.soil.κ = thermal_conductivity(
             model.parameters.κ_dry,

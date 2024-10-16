@@ -824,18 +824,6 @@ function linear_interpolation_to_surface!(sfc_field, center_field, z, Δz_top)
 end
 
 """
-"""
-function average_seven_to_surface!(sfc_field, center_field, z, Δz_top)
-    linear_interpolation_to_surface!(sfc_field, center_field, z, Δz_top)
-    # Find the first level that has z >= 7
-    # TODO Make this actually average 7 to surface
-    nz = Spaces.nlevels(axes(center_field))
-    f1 = ClimaCore.Fields.field_values(ClimaCore.Fields.level(center_field, nz))
-    ClimaCore.Fields.field_values(sfc_field) .=
-        (ClimaCore.Fields.field_values(sfc_field) .+ f1) ./ 2
-end
-
-"""
     bottom_center_to_surface(center_field::ClimaCore.Fields.Field)
 
 Creates and returns a ClimaCore.Fields.Field defined on the space

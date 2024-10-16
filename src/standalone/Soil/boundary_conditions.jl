@@ -684,6 +684,12 @@ boundary_vars(bc::AtmosDrivenFluxBC, ::ClimaLand.TopBoundary) = (
     :R_n,
     :top_bc,
     :sfc_scratch,
+    :PAR_albedo,
+    :NIR_albedo,
+    :top_θ_l,
+    :top_volume,
+    :clipped_depths,
+    :subsfc_scratch,
     Runoff.runoff_vars(bc.runoff)...,
 )
 
@@ -700,6 +706,12 @@ boundary_var_domain_names(bc::AtmosDrivenFluxBC, ::ClimaLand.TopBoundary) = (
     :surface,
     :surface,
     :surface,
+    :surface,
+    :surface,
+    :surface,
+    :surface,
+    :subsurface,
+    :subsurface,
     Runoff.runoff_var_domain_names(bc.runoff)...,
 )
 """
@@ -723,6 +735,12 @@ boundary_var_types(
     },
     FT,
     NamedTuple{(:water, :heat), Tuple{FT, FT}},
+    FT,
+    FT,
+    FT,
+    FT,
+    FT,
+    FT,
     FT,
     Runoff.runoff_var_types(bc.runoff, FT)...,
 )
