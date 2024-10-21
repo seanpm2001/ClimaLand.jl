@@ -80,7 +80,8 @@ function setup_prob(t0, tf, Δt; outdir = outdir, nelements = (101, 15))
         Interpolations.Periodic(),
         Interpolations.Flat(),
     )
-    soil_params_mask = SpaceVaryingInputs.SpaceVaryingInput(
+    comms_ctx = ClimaComms.context(surface_space);
+    soil_params_mask = SpaceVaryingInput(
         ClimaLand.Artifacts.earth_orography_file_path(; context = comms_ctx),
         "z",
         surface_space;
