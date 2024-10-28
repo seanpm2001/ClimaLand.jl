@@ -38,3 +38,10 @@ git-tree-sha1 = "b849eb95c09190095e7bf021494ddeda8858af01"
     [[modis_clumping_index.download]]
     sha256 = "e4c766a93a673e5dc22540687ef5616416d65bb13a0f4a67789b95d49ccbb158"
     url = "https://caltech.box.com/shared/static/ec2y3k5kqpl9wjvtsx3584wgkp5q8dyw.gz"
+
+[ilamb_data]
+git-tree-sha1 = "839224a62b59d73073bdb9a5c55d3dc75e30fe33"
+
+    [[ilamb_data.download]]
+    sha256 = "64a9a344ebfbb0113014178a1f93a655c401431565907c07fd33aff8860b62d6"
+    url = "https://caltech.box.com/shared/static/eii2bfwfp47axfeuysgxlgzbczz27u5g.gz"
